@@ -47,7 +47,10 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// Cache bust: v2 - force new URL
+// Use localhost:8001 for local development, otherwise use env variable
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BACKEND_URL = isLocalhost ? 'http://localhost:8001' : (process.env.REACT_APP_BACKEND_URL || window.location.origin);
 const API = `${BACKEND_URL}/api`;
 
 // Admin Auth Context
