@@ -8,7 +8,7 @@ import {
   Plus, LogOut, User, Settings, Tractor, Wrench, Cog, Loader2,
   ChevronLeft, MessageCircle, Share2, Heart, Filter, Grid, List,
   Upload, Image as ImageIcon, Trash2, Edit, Camera, Shield, Lock, Mail,
-  Store, Users, Building2, Package
+  Store, Users, Building2, Package, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -2563,6 +2563,12 @@ const AdminPage = () => {
   // Edit Listing Modal
   const [showEditListingModal, setShowEditListingModal] = useState(false);
   const [editingListing, setEditingListing] = useState(null);
+  const [editListingData, setEditListingData] = useState({});
+
+  // User Listings Modal
+  const [showUserListingsModal, setShowUserListingsModal] = useState(false);
+  const [userListings, setUserListings] = useState({ user: null, listings: [], total: 0 });
+  const [loadingUserListings, setLoadingUserListings] = useState(false);
 
   useEffect(() => {
     if (!admin) {
@@ -2776,6 +2782,95 @@ const AdminPage = () => {
       fetchUsers();
     } catch (error) {
       toast.error("Erro ao remover dealer");
+    }
+  };
+
+  // Expire listing manually
+  const handleExpireListing = async (listingId) => {
+    if (!window.confirm('Tem certeza que deseja expirar este anúncio?')) return;
+    try {
+      await axios.post(`${API}/admin/listings/${listingId}/expire`, {}, { withCredentials: true });
+      toast.success("Anúncio expirado!");
+      fetchListings();
+      fetchStats();
+    } catch (error) {
+      toast.error("Erro ao expirar anúncio");
+    }
+  };
+
+  // Edit listing
+  const handleOpenEditListing = (listing) => {
+    setEditingListing(listing);
+    setEditListingData({
+      title: listing.title || '',
+      description: listing.description || '',
+      category: listing.category || '',
+      price: listing.price || '',
+      brand: listing.brand || '',
+      model: listing.model || '',
+      year: listing.year || '',
+      hours_used: listing.hours_used || '',
+      condition: listing.condition || '',
+      city: listing.city || '',
+      whatsapp: listing.whatsapp || '',
+      status: listing.status || 'pending',
+      is_featured: listing.is_featured || false
+    });
+    setShowEditListingModal(true);
+  };
+
+  const handleUpdateListing = async (e) => {
+    e.preventDefault();
+    if (!editingListing) return;
+    
+    try {
+      const updateData = { ...editListingData };
+      if (updateData.price) updateData.price = parseFloat(updateData.price);
+      if (updateData.year) updateData.year = parseInt(updateData.year);
+      if (updateData.hours_used) updateData.hours_used = parseInt(updateData.hours_used);
+      
+      await axios.put(`${API}/admin/listings/${editingListing.listing_id}`, updateData, { withCredentials: true });
+      toast.success("Anúncio atualizado!");
+      setShowEditListingModal(false);
+      setEditingListing(null);
+      fetchListings();
+      fetchStats();
+    } catch (error) {
+      toast.error("Erro ao atualizar anúncio");
+    }
+  };
+
+  // Promote/Remove admin
+  const handleToggleAdmin = async (user) => {
+    const action = user.is_admin ? 'remover admin de' : 'promover a admin';
+    if (!window.confirm(`Tem certeza que deseja ${action} ${user.name}?`)) return;
+    
+    try {
+      if (user.is_admin) {
+        await axios.post(`${API}/admin/remove-admin/${user.user_id}`, {}, { withCredentials: true });
+        toast.success("Admin removido!");
+      } else {
+        await axios.post(`${API}/admin/make-admin/${user.user_id}`, {}, { withCredentials: true });
+        toast.success("Usuário promovido a admin!");
+      }
+      fetchUsers();
+    } catch (error) {
+      toast.error("Erro ao alterar status de admin");
+    }
+  };
+
+  // View user listings
+  const handleViewUserListings = async (user) => {
+    setLoadingUserListings(true);
+    setShowUserListingsModal(true);
+    try {
+      const res = await axios.get(`${API}/admin/users/${user.user_id}/listings`, { withCredentials: true });
+      setUserListings(res.data);
+    } catch (error) {
+      toast.error("Erro ao carregar anúncios do usuário");
+      setShowUserListingsModal(false);
+    } finally {
+      setLoadingUserListings(false);
     }
   };
 
@@ -3006,7 +3101,7 @@ const AdminPage = () => {
 
           <TabsContent value="listings">
             <Tabs value={filter} onValueChange={setFilter}>
-              <TabsList className="mb-6 bg-slate-800">
+              <TabsList className="mb-6 bg-slate-800 flex-wrap">
                 <TabsTrigger value="pending" className="data-[state=active]:bg-amber-600" data-testid="tab-pending">
                   Pendentes
                 </TabsTrigger>
@@ -3015,6 +3110,9 @@ const AdminPage = () => {
                 </TabsTrigger>
                 <TabsTrigger value="rejected" className="data-[state=active]:bg-red-600" data-testid="tab-rejected">
                   Rejeitados
+                </TabsTrigger>
+                <TabsTrigger value="expired" className="data-[state=active]:bg-slate-600" data-testid="tab-expired">
+                  Expirados
                 </TabsTrigger>
               </TabsList>
 
@@ -3044,18 +3142,39 @@ const AdminPage = () => {
                             )}
                           </div>
                           <div className="flex-1 p-4">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <h3 className="font-semibold text-lg text-white">{listing.title}</h3>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h3 className="font-semibold text-lg text-white">{listing.title}</h3>
+                                  {listing.is_featured && (
+                                    <Badge className="bg-[#F9C02D] text-[#1A4D2E]">
+                                      <Star className="w-3 h-3 mr-1 fill-current" />
+                                      Destaque
+                                    </Badge>
+                                  )}
+                                </div>
                                 <p className="text-[#F9C02D] font-bold">{formatPrice(listing.price)}</p>
                                 <p className="text-sm text-slate-400">
                                   {listing.city} • Por: {listing.seller?.name || 'N/A'} ({listing.seller?.email})
                                 </p>
                                 <p className="text-sm text-slate-500">
-                                  Criado em: {new Date(listing.created_at).toLocaleDateString('pt-BR')}
+                                  Criado: {new Date(listing.created_at).toLocaleDateString('pt-BR')}
+                                  {listing.expires_at && ` • Expira: ${new Date(listing.expires_at).toLocaleDateString('pt-BR')}`}
                                 </p>
                               </div>
-                              <div className="flex gap-2">
+                              <div className="flex flex-wrap gap-2 justify-end">
+                                {/* Edit button - always visible */}
+                                <Button 
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleOpenEditListing(listing)}
+                                  className="text-blue-400 border-blue-700 hover:bg-blue-900/50"
+                                  data-testid={`edit-${listing.listing_id}`}
+                                >
+                                  <Edit className="w-4 h-4 mr-1" />
+                                  Editar
+                                </Button>
+
                                 {listing.status === 'pending' && (
                                   <>
                                     <Button 
@@ -3064,6 +3183,7 @@ const AdminPage = () => {
                                       className="bg-green-600 hover:bg-green-700"
                                       data-testid={`approve-${listing.listing_id}`}
                                     >
+                                      <Check className="w-4 h-4 mr-1" />
                                       Aprovar
                                     </Button>
                                     <Button 
@@ -3073,23 +3193,56 @@ const AdminPage = () => {
                                       className="text-red-400 border-red-700 hover:bg-red-900/50"
                                       data-testid={`reject-${listing.listing_id}`}
                                     >
+                                      <X className="w-4 h-4 mr-1" />
                                       Rejeitar
                                     </Button>
                                   </>
                                 )}
                                 {listing.status === 'approved' && (
+                                  <>
+                                    <Button 
+                                      size="sm"
+                                      variant={listing.is_featured ? "outline" : "default"}
+                                      onClick={() => handleFeature(listing.listing_id, !listing.is_featured)}
+                                      className={listing.is_featured ? "border-[#F9C02D] text-[#F9C02D]" : "bg-[#F9C02D] hover:bg-[#f5b00b] text-[#1A4D2E]"}
+                                      data-testid={`feature-${listing.listing_id}`}
+                                    >
+                                      <Star className={`w-4 h-4 mr-1 ${listing.is_featured ? 'fill-current' : ''}`} />
+                                      {listing.is_featured ? 'Remover' : 'Destacar'}
+                                    </Button>
+                                    <Button 
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleExpireListing(listing.listing_id)}
+                                      className="text-amber-400 border-amber-700 hover:bg-amber-900/50"
+                                      data-testid={`expire-${listing.listing_id}`}
+                                    >
+                                      <Clock className="w-4 h-4 mr-1" />
+                                      Expirar
+                                    </Button>
+                                  </>
+                                )}
+                                {listing.status === 'rejected' && (
                                   <Button 
                                     size="sm"
-                                    variant={listing.is_featured ? "outline" : "default"}
-                                    onClick={() => handleFeature(listing.listing_id, !listing.is_featured)}
-                                    className={listing.is_featured ? "border-[#F9C02D] text-[#F9C02D]" : "bg-[#F9C02D] hover:bg-[#f5b00b] text-[#1A4D2E]"}
-                                    data-testid={`feature-${listing.listing_id}`}
+                                    onClick={() => handleApprove(listing.listing_id)}
+                                    className="bg-green-600 hover:bg-green-700"
                                   >
-                                    <Star className={`w-4 h-4 mr-1 ${listing.is_featured ? 'fill-current' : ''}`} />
-                                    {listing.is_featured ? 'Remover Destaque' : 'Destacar'}
+                                    <Check className="w-4 h-4 mr-1" />
+                                    Reaprovar
                                   </Button>
                                 )}
-                                {/* Delete button for all listings */}
+                                {listing.status === 'expired' && (
+                                  <Button 
+                                    size="sm"
+                                    onClick={() => handleApprove(listing.listing_id)}
+                                    className="bg-green-600 hover:bg-green-700"
+                                  >
+                                    <Check className="w-4 h-4 mr-1" />
+                                    Reativar
+                                  </Button>
+                                )}
+                                {/* Delete button */}
                                 <Button 
                                   size="sm"
                                   variant="outline"
@@ -3108,7 +3261,7 @@ const AdminPage = () => {
                   </div>
                 ) : (
                   <Card className="p-12 text-center bg-slate-800 border-slate-700">
-                    <p className="text-slate-400">Nenhum anúncio {filter === 'pending' ? 'pendente' : filter === 'approved' ? 'aprovado' : 'rejeitado'}</p>
+                    <p className="text-slate-400">Nenhum anúncio {filter === 'pending' ? 'pendente' : filter === 'approved' ? 'aprovado' : filter === 'rejected' ? 'rejeitado' : 'expirado'}</p>
                   </Card>
                 )}
               </TabsContent>
@@ -3246,28 +3399,43 @@ const AdminPage = () => {
                         <div>
                           <p className="font-medium text-white">{user.name}</p>
                           <p className="text-sm text-slate-400">{user.email}</p>
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
                             {user.role === 'dealer' ? (
                               <Badge className="bg-[#F9C02D] text-[#1A4D2E]">
                                 <Store className="w-3 h-3 mr-1" />
-                                Dealer ({user.dealer_profile?.max_listings || 20} anúncios)
+                                Dealer ({user.dealer_profile?.max_listings || 20})
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-slate-400 border-slate-600">
                                 <User className="w-3 h-3 mr-1" />
-                                Individual ({user.max_listings || 3} anúncios)
+                                Individual ({user.max_listings || 3})
                               </Badge>
                             )}
                             {user.is_admin && (
-                              <Badge className="bg-red-600">Admin</Badge>
+                              <Badge className="bg-red-600">
+                                <Shield className="w-3 h-3 mr-1" />
+                                Admin
+                              </Badge>
                             )}
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 ml-12 sm:ml-0">
+                      <div className="flex items-center gap-2 ml-12 sm:ml-0 flex-wrap">
                         <span className="text-xs text-slate-500 hidden sm:block">
                           {new Date(user.created_at).toLocaleDateString('pt-BR')}
                         </span>
+                        {/* View User Listings */}
+                        <Button 
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleViewUserListings(user)}
+                          className="text-slate-300 border-slate-600 hover:bg-slate-600"
+                          data-testid={`view-listings-${user.user_id}`}
+                        >
+                          <Package className="w-4 h-4 mr-1" />
+                          Anúncios
+                        </Button>
+                        {/* Edit Limit */}
                         {user.role !== 'dealer' && (
                           <Button 
                             size="sm"
@@ -3278,11 +3446,13 @@ const AdminPage = () => {
                               setShowEditUserModal(true);
                             }}
                             className="text-slate-300 border-slate-600 hover:bg-slate-600"
+                            data-testid={`edit-limit-${user.user_id}`}
                           >
                             <Edit className="w-4 h-4 mr-1" />
                             Limite
                           </Button>
                         )}
+                        {/* Promote to Dealer */}
                         {user.role !== 'dealer' && !user.is_admin && (
                           <Button 
                             size="sm"
@@ -3292,17 +3462,34 @@ const AdminPage = () => {
                               setShowPromoteModal(true);
                             }}
                             className="text-[#F9C02D] border-[#F9C02D] hover:bg-[#F9C02D]/20"
+                            data-testid={`promote-dealer-${user.user_id}`}
                           >
                             <Store className="w-4 h-4 mr-1" />
                             Dealer
                           </Button>
                         )}
+                        {/* Toggle Admin Status */}
+                        <Button 
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleToggleAdmin(user)}
+                          className={user.is_admin 
+                            ? "text-amber-400 border-amber-700 hover:bg-amber-900/50" 
+                            : "text-purple-400 border-purple-700 hover:bg-purple-900/50"
+                          }
+                          data-testid={`toggle-admin-${user.user_id}`}
+                        >
+                          <Shield className="w-4 h-4 mr-1" />
+                          {user.is_admin ? 'Remover Admin' : 'Tornar Admin'}
+                        </Button>
+                        {/* Delete User */}
                         {!user.is_admin && (
                           <Button 
                             size="sm"
                             variant="outline"
                             onClick={() => handleDeleteUser(user)}
                             className="text-red-400 border-red-700 hover:bg-red-900/50"
+                            data-testid={`delete-user-${user.user_id}`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -3469,6 +3656,255 @@ const AdminPage = () => {
                 </Button>
               </div>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Listing Modal */}
+        <Dialog open={showEditListingModal} onOpenChange={setShowEditListingModal}>
+          <DialogContent className="bg-slate-800 border-slate-700 max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-white">Editar Anúncio</DialogTitle>
+              <DialogDescription className="text-slate-400">
+                {editingListing?.listing_id}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleUpdateListing} className="space-y-4 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <Label className="text-slate-300">Título</Label>
+                  <Input
+                    value={editListingData.title || ''}
+                    onChange={(e) => setEditListingData({...editListingData, title: e.target.value})}
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label className="text-slate-300">Descrição</Label>
+                  <textarea
+                    value={editListingData.description || ''}
+                    onChange={(e) => setEditListingData({...editListingData, description: e.target.value})}
+                    rows={3}
+                    className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Categoria</Label>
+                  <select
+                    value={editListingData.category || ''}
+                    onChange={(e) => setEditListingData({...editListingData, category: e.target.value})}
+                    className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
+                  >
+                    <option value="tratores">Tratores</option>
+                    <option value="implementos">Implementos</option>
+                    <option value="colheitadeiras">Colheitadeiras</option>
+                    <option value="pecas">Peças</option>
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-slate-300">Preço (R$)</Label>
+                  <Input
+                    type="number"
+                    value={editListingData.price || ''}
+                    onChange={(e) => setEditListingData({...editListingData, price: e.target.value})}
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Marca</Label>
+                  <Input
+                    value={editListingData.brand || ''}
+                    onChange={(e) => setEditListingData({...editListingData, brand: e.target.value})}
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Modelo</Label>
+                  <Input
+                    value={editListingData.model || ''}
+                    onChange={(e) => setEditListingData({...editListingData, model: e.target.value})}
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Ano</Label>
+                  <Input
+                    type="number"
+                    value={editListingData.year || ''}
+                    onChange={(e) => setEditListingData({...editListingData, year: e.target.value})}
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Horas de Uso</Label>
+                  <Input
+                    type="number"
+                    value={editListingData.hours_used || ''}
+                    onChange={(e) => setEditListingData({...editListingData, hours_used: e.target.value})}
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Condição</Label>
+                  <select
+                    value={editListingData.condition || ''}
+                    onChange={(e) => setEditListingData({...editListingData, condition: e.target.value})}
+                    className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
+                  >
+                    <option value="novo">Novo</option>
+                    <option value="usado">Usado</option>
+                    <option value="seminovo">Seminovo</option>
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-slate-300">Cidade</Label>
+                  <Input
+                    value={editListingData.city || ''}
+                    onChange={(e) => setEditListingData({...editListingData, city: e.target.value})}
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">WhatsApp</Label>
+                  <Input
+                    value={editListingData.whatsapp || ''}
+                    onChange={(e) => setEditListingData({...editListingData, whatsapp: e.target.value})}
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Status</Label>
+                  <select
+                    value={editListingData.status || ''}
+                    onChange={(e) => setEditListingData({...editListingData, status: e.target.value})}
+                    className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
+                  >
+                    <option value="pending">Pendente</option>
+                    <option value="approved">Aprovado</option>
+                    <option value="rejected">Rejeitado</option>
+                    <option value="expired">Expirado</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-3 pt-6">
+                  <input
+                    type="checkbox"
+                    id="is_featured"
+                    checked={editListingData.is_featured || false}
+                    onChange={(e) => setEditListingData({...editListingData, is_featured: e.target.checked})}
+                    className="w-5 h-5 bg-slate-700 border-slate-600 rounded"
+                  />
+                  <Label htmlFor="is_featured" className="text-slate-300 cursor-pointer">
+                    Anúncio em Destaque
+                  </Label>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowEditListingModal(false)}
+                  className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit"
+                  className="flex-1 bg-[#1A4D2E] hover:bg-[#143d24]"
+                >
+                  Salvar Alterações
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* User Listings Modal */}
+        <Dialog open={showUserListingsModal} onOpenChange={setShowUserListingsModal}>
+          <DialogContent className="bg-slate-800 border-slate-700 max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-white">
+                Anúncios de {userListings.user?.name || '...'}
+              </DialogTitle>
+              <DialogDescription className="text-slate-400">
+                {userListings.user?.email} • Total: {userListings.total} anúncios
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-4 space-y-3">
+              {loadingUserListings ? (
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => (
+                    <Skeleton key={i} className="h-20 rounded-lg bg-slate-700" />
+                  ))}
+                </div>
+              ) : userListings.listings.length > 0 ? (
+                userListings.listings.map(listing => (
+                  <div key={listing.listing_id} className="flex items-center gap-4 p-3 bg-slate-700 rounded-lg">
+                    <div className="w-16 h-16 bg-slate-600 rounded flex-shrink-0 overflow-hidden">
+                      {listing.images?.[0] ? (
+                        <img 
+                          src={`${API}/files/${listing.images[0]}`}
+                          alt={listing.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Tractor className="w-8 h-8 text-slate-500" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-white truncate">{listing.title}</h4>
+                      <p className="text-sm text-[#F9C02D]">{formatPrice(listing.price)}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge 
+                          className={
+                            listing.status === 'approved' ? 'bg-green-600' :
+                            listing.status === 'pending' ? 'bg-amber-600' :
+                            listing.status === 'rejected' ? 'bg-red-600' :
+                            'bg-slate-600'
+                          }
+                        >
+                          {listing.status === 'approved' ? 'Aprovado' :
+                           listing.status === 'pending' ? 'Pendente' :
+                           listing.status === 'rejected' ? 'Rejeitado' : 'Expirado'}
+                        </Badge>
+                        {listing.is_featured && (
+                          <Badge className="bg-[#F9C02D] text-[#1A4D2E]">
+                            <Star className="w-3 h-3 mr-1 fill-current" />
+                            Destaque
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setShowUserListingsModal(false);
+                          handleOpenEditListing(listing);
+                        }}
+                        className="text-blue-400 border-blue-700 hover:bg-blue-900/50"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteListing(listing.listing_id)}
+                        className="text-red-400 border-red-700 hover:bg-red-900/50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <Package className="w-12 h-12 text-slate-500 mx-auto mb-2" />
+                  <p className="text-slate-400">Nenhum anúncio encontrado</p>
+                </div>
+              )}
+            </div>
           </DialogContent>
         </Dialog>
       </div>
