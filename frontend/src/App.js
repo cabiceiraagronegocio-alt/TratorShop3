@@ -252,12 +252,12 @@ const Header = () => {
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2" data-testid="logo-link">
-            <div className="w-10 h-10 bg-[#1A4D2E] rounded-lg flex items-center justify-center">
-              <Tractor className="w-6 h-6 text-white" />
-            </div>
-            <span className="font-bold text-xl text-[#1A4D2E] hidden sm:block" style={{ fontFamily: 'Outfit' }}>
-              TratorShop
-            </span>
+            {/* Logo responsiva - usa imagem */}
+            <img 
+              src="/logo-light.png" 
+              alt="TratorShop" 
+              className="h-10 md:h-12 w-auto object-contain"
+            />
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
@@ -404,10 +404,12 @@ const Footer = () => (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
-              <Tractor className="w-6 h-6 text-[#F9C02D]" />
-            </div>
-            <span className="font-bold text-xl" style={{ fontFamily: 'Outfit' }}>TratorShop</span>
+            {/* Logo para dark mode (fundo verde) */}
+            <img 
+              src="/logo-dark.png" 
+              alt="TratorShop" 
+              className="h-10 w-auto object-contain"
+            />
           </div>
           <p className="text-white/70 text-sm">
             O maior marketplace de máquinas agrícolas do Mato Grosso do Sul.
@@ -2824,8 +2826,13 @@ const AdminLoginPage = () => {
       
       <Card className="w-full max-w-md border-slate-700 bg-slate-800">
         <CardHeader className="text-center">
-          <div className="w-16 h-16 bg-[#1A4D2E] rounded-xl flex items-center justify-center mx-auto mb-4">
-            <Shield className="w-10 h-10 text-white" />
+          <div className="mx-auto mb-4">
+            {/* Logo para fundo escuro */}
+            <img 
+              src="/logo-dark.png" 
+              alt="TratorShop" 
+              className="h-12 w-auto object-contain mx-auto"
+            />
           </div>
           <h1 className="text-2xl font-bold text-white" style={{ fontFamily: 'Outfit' }}>
             Área Administrativa
@@ -3474,12 +3481,14 @@ const AdminPage = () => {
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#1A4D2E] rounded-lg flex items-center justify-center">
-                <Shield className="w-6 h-6 text-white" />
-              </div>
+              <img 
+                src="/logo-dark.png" 
+                alt="TratorShop" 
+                className="h-8 w-auto object-contain"
+              />
               <div>
                 <span className="font-bold text-white" style={{ fontFamily: 'Outfit' }}>
-                  TratorShop Admin
+                  Admin
                 </span>
                 <p className="text-xs text-slate-400">{admin.email}</p>
               </div>

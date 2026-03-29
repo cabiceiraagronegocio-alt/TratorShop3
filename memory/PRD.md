@@ -9,70 +9,63 @@
 - **Auth:** Emergent Auth (Google OAuth + Email/Senha)
 - **Storage:** Object Storage (Emergent Storage API)
 
-## Planos de Assinatura (Trimestrais - 90 dias)
+## Logo e Branding
+
+### Arquivos de Logo
+- `logo-light.png` - Logo 1200x400 para fundo claro (header)
+- `logo-dark.png` - Logo 1200x400 para fundo escuro (footer, admin)
+- `logo-512.png` - Logo 512x512 para PWA e redes sociais
+
+### Favicons
+- `favicon.ico` - Multi-size (48, 32, 16)
+- `favicon-16x16.png`
+- `favicon-32x32.png`
+- `apple-touch-icon.png` (180x180)
+- `android-chrome-192x192.png`
+
+### Cores da Marca
+- Verde principal: `#1A4D2E`
+- Amarelo destaque: `#F9C02D`
+- Branco: `#FFFFFF`
+
+## Implementação de Logo (29/03/2026)
+
+### Header (fundo branco)
+- Usa `logo-light.png`
+- Responsiva com height fixo
+
+### Footer (fundo verde)
+- Usa `logo-dark.png`
+- Adapta automaticamente ao tema
+
+### Admin (fundo escuro)
+- Usa `logo-dark.png`
+- Aplicada em login e painel
+
+### Meta Tags
+- Open Graph configurado
+- Twitter Cards configurado
+- PWA Manifest com ícones
+
+## Planos de Assinatura (Trimestrais)
 
 | Plano | Limite | Preço | 1ª Parcela | Validade |
 |-------|--------|-------|------------|----------|
-| Anúncio Único | 1 | R$49 | R$49 | 3 meses (trimestral) |
-| Lojista | 20 | R$149 | R$97 | 3 meses (trimestral) |
+| Anúncio Único | 1 | R$49 | R$49 | 3 meses |
+| Lojista | 20 | R$149 | R$97 | 3 meses |
 
-## Correções Aplicadas (29/03/2026 - Sessão 2)
-
-### 1️⃣ Planos - Texto "Trimestral"
-- ✅ Adicionado "trimestral" nos textos de planos
-- ✅ Texto "válido por 3 meses" na escolha de planos
-- ✅ "pagamento trimestral" no card do plano
-
-### 2️⃣ Bug Duplicação de Anúncios
-- ✅ Verificação de idempotência no backend (30 segundos)
-- ✅ Proteção `if (loading) return;` no frontend
-- ✅ Retorna anúncio existente se duplicado
-
-### 3️⃣ Upload de Foto de Perfil
-- ✅ Corrigido para usar `put_object` (igual anúncios)
-- ✅ Salva caminho no campo `picture` do usuário
-- ✅ Funciona com storage Emergent
-
-### 4️⃣ Página Pública do Vendedor
-- ✅ Rota: `/vendedor/{userId}`
-- ✅ SEO-friendly e indexável
-- ✅ Mostra: foto, nome, bio, endereço, anúncios
-- ✅ Botão WhatsApp
-- ✅ Botão Compartilhar (copia link)
-- ✅ Endpoint: `GET /api/vendedor/{user_id}`
-
-### 5️⃣ Limite Lojista = 20
-- ✅ Corrigido de 10 para 20 no backend
-- ✅ `dealer_profile.max_listings = 20`
-
-### 6️⃣ Filtro Estado do Produto
-- ✅ Filtros: Todos, Novo, Semi-novo, Usado
-- ✅ Adicionado na SearchPage
-- ✅ Backend: `GET /api/listings?condition=novo`
-
-### 7️⃣ Admin - Fotos na Aprovação
-- ✅ Fotos visíveis em cada anúncio
-- ✅ Botão X para excluir foto individual
-- ✅ `DELETE /api/listings/{id}/images/{index}`
-
-### 8️⃣ Admin - Notificação de Pendentes
-- ✅ Badge numérico no header
-- ✅ Mostra quantidade de usuários pendentes
-- ✅ Clicável para ir à aba de usuários
-
-## Funcionalidades Completas
+## Funcionalidades Principais
 
 ### Sistema de Aprovação Manual
 - Status: `pending_approval` → `active` / `rejected`
-- Dashboard mostra aviso "em análise"
-- Bloqueio de criação de anúncios até aprovação
+- Bloqueio de criação até aprovação
 
 ### Painel Admin
 - Dashboard com estatísticas
-- Aba Leads (contatos pendentes)
-- Aba Anúncios (com fotos e exclusão individual)
-- Aba Usuários (com pendentes em destaque)
-- Aba Dealers
+- Leads (contatos pendentes)
+- Anúncios (com fotos e exclusão individual)
+- Usuários (com pendentes)
+- Dealers
 - Criar usuário manualmente
 - Badge de notificação
 
@@ -91,7 +84,3 @@
 - [ ] Dashboard analytics para vendedor
 - [ ] Sistema de favoritos
 - [ ] Chat interno
-
-### P3 - Futuro
-- [ ] App mobile
-- [ ] Sistema de avaliações
