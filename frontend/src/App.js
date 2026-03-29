@@ -670,7 +670,7 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
   };
 
   const handleFileSelect = async (e) => {
-    const files = Array.from(e.target.files);
+    const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
     if (images.length + files.length > maxImages) {
@@ -685,17 +685,22 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
 
     for (let i = 0; i < files.length; i++) {
       let file = files[i];
-      const fileName = file.name.toLowerCase();
+      const fileName = (file.name || 'image.jpg').toLowerCase();
       
-      // Check for HEIC format
-      const isHeic = fileName.endsWith('.heic') || fileName.endsWith('.heif') || file.type === 'image/heic' || file.type === 'image/heif';
+      // Check for HEIC format - also check for empty type (common on iOS)
+      const isHeic = fileName.endsWith('.heic') || fileName.endsWith('.heif') || 
+                     file.type === 'image/heic' || file.type === 'image/heif' ||
+                     (file.type === '' && (fileName.endsWith('.heic') || fileName.endsWith('.heif')));
       
-      // Validate file type (including HEIC)
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+      // Validate file type (including HEIC) - be more lenient for mobile
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', ''];
       const validExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'];
       const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
       
-      if (!validTypes.includes(file.type) && !hasValidExtension && !isHeic) {
+      // If type is empty but it's an image from camera, treat as valid
+      const isLikelyImage = file.type.startsWith('image/') || file.type === '' || hasValidExtension;
+      
+      if (!isLikelyImage && !hasValidExtension && !isHeic) {
         toast.error(`${file.name}: Formato não suportado. Use JPG, PNG, WEBP ou HEIC`);
         continue;
       }
@@ -707,13 +712,19 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
           file = await convertHeicToJpeg(file);
         }
         
-        // Compress image if larger than 1MB
-        if (file.size > 1024 * 1024) {
-          file = await compressImage(file);
+        // Always compress images for mobile - reduces upload time
+        // Compress all images larger than 500KB or if they don't have proper dimensions
+        if (file.size > 500 * 1024) {
+          try {
+            file = await compressImage(file);
+          } catch (compressErr) {
+            console.warn("Compression failed, using original:", compressErr);
+            // Continue with original file if compression fails
+          }
         }
 
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', file, file.name || 'image.jpg');
         
         const res = await axios.post(
           `${API}/listings/${listingId}/images`,
@@ -721,9 +732,12 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
           { 
             withCredentials: true,
             headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 60000, // 60 second timeout for mobile
             onUploadProgress: (progressEvent) => {
-              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-              setUploadProgress(Math.round(((i + percentCompleted / 100) / files.length) * 100));
+              if (progressEvent.total) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                setUploadProgress(Math.round(((i + percentCompleted / 100) / files.length) * 100));
+              }
             }
           }
         );
@@ -731,13 +745,16 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
         setUploadProgress(Math.round(((i + 1) / files.length) * 100));
       } catch (error) {
         console.error("Error uploading image:", error);
-        toast.error(`Erro ao enviar ${file.name}`);
+        const errorMsg = error.response?.data?.detail || error.message || 'Erro desconhecido';
+        toast.error(`Erro ao enviar ${file.name}: ${errorMsg}`);
       }
     }
 
     if (newImages.length > 0) {
       onImagesChange([...images, ...newImages]);
       toast.success(`${newImages.length} imagem(ns) enviada(s)`);
+    } else if (files.length > 0) {
+      toast.error("Nenhuma imagem foi enviada. Verifique sua conexão.");
     }
     setUploading(false);
     setUploadProgress(0);
@@ -809,9 +826,8 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
+              accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif"
               multiple
-              capture="environment"
               onChange={handleFileSelect}
               className="hidden"
               disabled={uploading}
