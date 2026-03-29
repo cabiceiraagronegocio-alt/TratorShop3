@@ -1,183 +1,274 @@
-# TratorShop - PRD (Product Requirements Document)
+# TratorShop - Documentação Completa do Projeto
 
-## Visão Geral
-Marketplace de máquinas agrícolas focado no Mato Grosso do Sul (MS), Brasil.
+## Resumo Executivo
+Marketplace de máquinas agrícolas focado no **Mato Grosso do Sul (MS)**, Brasil. Permite que vendedores individuais e lojistas anunciem tratores, implementos, colheitadeiras e peças.
+
+---
 
 ## Stack Técnica
-- **Frontend:** React 19, TailwindCSS, Shadcn/UI, React Router v7
-- **Backend:** FastAPI (Python), Motor (MongoDB async)
-- **Database:** MongoDB
-- **Storage:** Emergent Object Storage
-- **Auth:** Google OAuth (Emergent) + Email/Password
 
-## Repositório
-- **GitHub:** https://github.com/agenciasuportapoio09-art/Trator2.git
-- **Branch:** main
-
----
-
-## User Personas
-
-### 1. Vendedor Individual (account_type: "individual")
-- Limite: 3 anúncios ativos
-- Role: "user"
-- Pode criar conta via Google ou Email/Senha
-
-### 2. Lojista/Dealer (account_type: "dealer")
-- Limite: 10 anúncios (expansível pelo admin)
-- Role: "dealer"
-- Página de loja pública (`/loja/:slug`)
-- Perfil de loja personalizável (dealer_profile)
-
-### 3. Administrador
-- Collection separada: `admins`
-- Acesso via `/admin-login`
-- Permissões completas: gerenciar usuários, dealers, anúncios
+| Camada | Tecnologia |
+|--------|------------|
+| **Frontend** | React 19, TailwindCSS, Shadcn/UI, React Router v7, Leaflet |
+| **Backend** | FastAPI (Python) com Motor (async MongoDB) |
+| **Banco de Dados** | MongoDB |
+| **Storage** | Emergent Object Storage (imagens) |
+| **Autenticação** | Emergent Auth (Google OAuth + Email/Senha) |
 
 ---
 
-## Core Requirements (Static)
+## Estrutura de Arquivos Principais
 
-### Autenticação
-- [x] Login via Google OAuth
-- [x] Login via Email/Senha
-- [x] Cadastro de novos usuários
-- [x] Sistema de sessões (cookies httpOnly)
-- [x] Logout
-
-### Onboarding (NOVO)
-- [x] Página `/onboarding` obrigatória após primeiro login
-- [x] Pergunta: "Como deseja anunciar?"
-- [x] Opção 1: Anúncio Único (individual) - 3 anúncios grátis
-- [x] Opção 2: Lojista/Revendedor (dealer) - 10 anúncios + página exclusiva
-- [x] Bloqueia acesso ao painel até completar
-- [x] Usuários existentes não são afetados
-
-### Anúncios
-- [x] Criar anúncio (com imagens)
-- [x] Workflow: Pending → Approved → Published
-- [x] Editar anúncio próprio
-- [x] Deletar anúncio próprio
-- [x] Expiração automática (90 dias)
-- [x] Sistema de destaque (featured)
-
-### Admin
-- [x] Aprovar/Rejeitar anúncios
-- [x] Gerenciar usuários
-- [x] Promover usuário a Dealer
-- [x] Ajustar limites de anúncios
-
-### Upload de Imagens
-- [x] Upload para Emergent Object Storage
-- [x] Múltiplas imagens por anúncio
-
----
-
-## Schema do Banco de Dados
-
-### Collection: users
-```javascript
-{
-  user_id: "user_xxxx",
-  email: string,
-  name: string,
-  picture: string | null,
-  password_hash: string | null,  // Se login por email
-  is_admin: boolean,
-  role: "user" | "dealer",
-  account_type: "individual" | "dealer",  // Definido no onboarding
-  onboarding_complete: boolean,           // Bloqueia até true
-  max_listings: number,                   // 3 para individual
-  dealer_profile: {                       // Apenas para dealers
-    store_name: string,
-    store_slug: string,
-    store_logo: string | null,
-    whatsapp: string,
-    city: string,
-    description: string,
-    max_listings: number,  // 10 inicial
-    is_active: boolean,
-    created_at: string
-  },
-  created_at: string
-}
 ```
-
-### Collection: admins (separada)
-```javascript
-{
-  admin_id: "admin_xxxx",
-  email: string,
-  name: string,
-  password_hash: string,
-  role: "admin" | "super_admin",
-  must_change_password: boolean,
-  created_at: string
-}
+/app/
+├── backend/
+│   ├── server.py          # API FastAPI completa (~1700 linhas)
+│   ├── requirements.txt   # Dependências Python
+│   └── .env               # Configurações (MONGO_URL, EMERGENT_LLM_KEY)
+├── frontend/
+│   ├── src/
+│   │   ├── App.js         # Aplicação React completa (~4500 linhas)
+│   │   ├── App.css        # Estilos
+│   │   └── components/ui/ # Componentes Shadcn
+│   ├── package.json
+│   └── .env               # REACT_APP_BACKEND_URL
+└── memory/
+    └── PRD.md             # Este arquivo
 ```
 
 ---
 
-## O Que Foi Implementado
+## Tipos de Usuário
 
-### 2026-03-22 - Sessão 1
-- [x] Clonado repositório do GitHub
-- [x] Configurado ambiente (.env files)
-- [x] Configurado EMERGENT_LLM_KEY para uploads
-- [x] Testado upload de imagens - FUNCIONANDO
-
-### 2026-03-22 - Sessão 2 (Correções de UX)
-- [x] Botão "ENTRAR" corrigido: Agora redireciona para `/login`
-- [x] Link Admin no Footer: "Área Administrativa"
-- [x] Menu Mobile: Botão "Entrar / Cadastrar"
-
-### 2026-03-22 - Sessão 3 (Onboarding)
-- [x] Criada página `/onboarding` (full page experience)
-- [x] Implementado fluxo: Login → Onboarding → Dashboard
-- [x] Opção "Anúncio Único": account_type=individual, max_listings=3
-- [x] Opção "Lojista": account_type=dealer, dealer_profile criado, max_listings=10
-- [x] Proteção: /dashboard e /anunciar redirecionam para onboarding se incompleto
-- [x] Usuários existentes marcados como onboarding_complete=true
-
----
-
-## Prioritized Backlog
-
-### P0 - Crítico
-- Nenhum no momento
-
-### P1 - Alta Prioridade
-- [ ] Email: Notificações para aprovação/rejeição de anúncios
-- [ ] Permitir alterar tipo de conta nas configurações
-
-### P2 - Média Prioridade
-- [ ] Dashboard Admin: Gráficos e métricas avançadas
-- [ ] Busca avançada: Filtros por ano, horas de uso
-- [ ] Sistema de favoritos para usuários
-
-### P3 - Baixa Prioridade
-- [ ] App mobile (React Native)
-- [ ] Integração com WhatsApp Business API
+| Tipo | Limite | Benefícios |
+|------|--------|------------|
+| **Individual** | 3 anúncios | Grátis, simples |
+| **Lojista/Dealer** | 10+ anúncios | Página própria `/loja/nome-da-loja` |
+| **Admin** | Ilimitado | Gerencia tudo: usuários, anúncios, dealers |
 
 ---
 
 ## Credenciais de Teste
 
-### Usuário Individual
-- Email: novousuario@teste.com
-- Senha: teste123456
-- Tipo: individual (3 anúncios)
-
-### Usuário Lojista
-- Email: lojista@teste.com
-- Senha: teste123456
-- Tipo: dealer (10 anúncios)
-- Loja: /loja/tratores-do-vale
-
-### Admin
-- Email: admin@tratorshop.com
-- Senha: Admin@123
+| Tipo | Email | Senha |
+|------|-------|-------|
+| **Admin** | admin@tratorshop.com | Admin@123 |
+| **Individual** | novousuario@teste.com | teste123456 |
+| **Lojista** | lojista@teste.com | teste123456 |
 
 ---
 
-*Última atualização: 2026-03-22*
+## Funcionalidades Implementadas
+
+### Sessão 1-3 (Anteriores)
+- [x] Setup inicial e clone do repositório
+- [x] Configuração de ambiente (.env)
+- [x] Login Google e Email/Senha
+- [x] Sistema de onboarding (individual vs dealer)
+- [x] Upload de imagens com Emergent Object Storage
+- [x] Sistema de anúncios com aprovação admin
+- [x] Página de loja para dealers
+- [x] SEO configurado
+- [x] Menu mobile com "Entrar/Cadastrar"
+- [x] Link admin no footer
+
+### Sessão 4 (Atual) - 26/03/2026
+
+#### Problema 1: Upload desabilitado (RESOLVIDO)
+- [x] Adicionada `EMERGENT_LLM_KEY` ao backend/.env
+- [x] Corrigida URL do backend (fallback para localhost em dev)
+- [x] Corrigido CORS para suportar credentials com origin dinâmico
+- [x] Upload de imagem testado e funcionando via API
+
+#### Problema 2: Painel Admin Completo (RESOLVIDO)
+
+**Anúncios:**
+- [x] Editar anúncios (modal completo com todos os campos)
+- [x] Alterar status (pending, approved, rejected, expired)
+- [x] Destacar/remover destaque (is_featured)
+- [x] Expirar manualmente (novo endpoint + botão)
+- [x] Tab "Expirados" adicionada
+- [x] Botões de ação rápida na tabela (Editar, Aprovar, Rejeitar, Destacar, Expirar, Excluir)
+
+**Usuários:**
+- [x] Listar todos usuários com badges de tipo
+- [x] Ver anúncios do usuário (modal)
+- [x] Alterar limite de anúncios (max_listings)
+- [x] Promover para Dealer
+- [x] Tornar Admin / Remover Admin
+- [x] Excluir usuário
+
+**Segurança:**
+- [x] Todas rotas protegidas com `require_admin()`
+- [x] Validação backend antes de cada operação
+
+**UX:**
+- [x] Ações rápidas na tabela
+- [x] Atualização dinâmica sem recarregar página
+
+---
+
+## Novos Endpoints Backend (Sessão 4)
+
+```python
+# Expirar anúncio manualmente
+POST /api/admin/listings/{listing_id}/expire
+
+# Promover usuário a admin
+POST /api/admin/make-admin/{user_id}
+
+# Remover status de admin
+POST /api/admin/remove-admin/{user_id}
+
+# Ver anúncios de um usuário específico
+GET /api/admin/users/{user_id}/listings
+```
+
+---
+
+## Endpoints Existentes (Principais)
+
+### Autenticação
+```
+POST /api/auth/register          # Cadastro
+POST /api/auth/login             # Login
+POST /api/auth/logout            # Logout
+GET  /api/auth/me                # Usuário atual
+POST /api/auth/callback          # Callback Google OAuth
+POST /api/onboarding             # Completar onboarding
+```
+
+### Anúncios (Público)
+```
+GET  /api/listings               # Listar anúncios aprovados
+GET  /api/listings/{id}          # Detalhes do anúncio
+GET  /api/listings/search        # Buscar anúncios
+```
+
+### Anúncios (Usuário)
+```
+POST /api/listings               # Criar anúncio
+PUT  /api/listings/{id}          # Editar anúncio
+DELETE /api/listings/{id}        # Excluir anúncio
+POST /api/listings/{id}/images   # Upload de imagem
+```
+
+### Admin
+```
+POST /api/admin/auth/login       # Login admin
+GET  /api/admin/stats            # Estatísticas
+GET  /api/admin/users            # Listar usuários
+PUT  /api/admin/users/{id}       # Editar usuário
+DELETE /api/admin/users/{id}     # Excluir usuário
+PUT  /api/admin/users/{id}/limit # Alterar limite
+GET  /api/admin/listings         # Listar todos anúncios
+PUT  /api/admin/listings/{id}    # Editar anúncio
+POST /api/admin/listings/{id}/approve  # Aprovar
+POST /api/admin/listings/{id}/reject   # Rejeitar
+POST /api/admin/listings/{id}/feature  # Destacar
+POST /api/admin/listings/{id}/expire   # Expirar
+GET  /api/admin/dealers          # Listar dealers
+POST /api/admin/dealers/promote  # Promover a dealer
+```
+
+---
+
+## Rotas Frontend
+
+| Rota | Descrição |
+|------|-----------|
+| `/` | Home com busca e categorias |
+| `/login` | Login (email + Google) |
+| `/onboarding` | Escolha de tipo de conta |
+| `/dashboard` | Painel do usuário |
+| `/meus-anuncios` | Meus anúncios |
+| `/anunciar` | Criar novo anúncio |
+| `/anuncio/{id}` | Detalhes do anúncio |
+| `/categoria/{cat}` | Listagem por categoria |
+| `/loja/{slug}` | Página da loja (dealer) |
+| `/admin-login` | Login admin |
+| `/admin` | Painel administrativo |
+
+---
+
+## Problemas Conhecidos
+
+### 1. URL Externa (Preview) - NÃO RESOLVIDO
+- **Problema:** URL preview serve site Framer da Emergent em vez do app
+- **Causa:** Problema de infraestrutura/roteamento da Emergent
+- **Solução:** Contatar suporte da Emergent ou fazer deploy em produção
+- **Status:** O app funciona 100% em localhost
+
+### 2. Upload Mobile - PENDENTE
+- **Problema:** Upload de imagens falha em alguns celulares
+- **Status:** Não investigado ainda
+
+---
+
+## Próximos Passos Sugeridos
+
+### Prioridade Alta
+1. [ ] Corrigir problema de URL externa (infra Emergent)
+2. [ ] Investigar e corrigir upload mobile
+
+### Prioridade Média
+3. [ ] Notificações por email (aprovação/rejeição)
+4. [ ] Permitir alterar tipo de conta nas configurações
+
+### Prioridade Baixa
+5. [ ] Filtros avançados de busca (ano, horas de uso)
+6. [ ] Sistema de favoritos
+7. [ ] Chat entre comprador e vendedor
+
+---
+
+## Configuração de Ambiente
+
+### Backend (.env)
+```
+MONGO_URL="mongodb://localhost:27017"
+DB_NAME="test_database"
+CORS_ORIGINS="*"
+EMERGENT_LLM_KEY="sk-emergent-XXXXX"
+```
+
+### Frontend (.env)
+```
+REACT_APP_BACKEND_URL=https://[URL_PREVIEW].preview.emergentagent.com
+WDS_SOCKET_PORT=443
+ENABLE_HEALTH_CHECK=false
+```
+
+---
+
+## Comandos Úteis
+
+```bash
+# Reiniciar serviços
+sudo supervisorctl restart backend frontend
+
+# Ver logs do backend
+tail -f /var/log/supervisor/backend.err.log
+
+# Ver logs do frontend
+tail -f /var/log/supervisor/frontend.err.log
+
+# Testar API
+curl http://localhost:8001/api/
+
+# Acessar MongoDB
+mongosh --eval 'db = db.getSiblingDB("test_database"); db.users.find({})'
+```
+
+---
+
+## Repositório GitHub
+- **Original:** https://github.com/agenciasuportapoio09-art/Trator2.git
+- **Novo (salvar):** Tratorshop3
+
+---
+
+## Última Atualização
+**Data:** 26/03/2026
+**Sessão:** 4
+**Status:** Painel Admin completo, aguardando correção de URL externa
