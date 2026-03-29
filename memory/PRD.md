@@ -10,81 +10,134 @@
 - **Storage:** Object Storage (Emergent Storage API)
 
 ## Personas
-1. **Vendedor Individual** - Pode criar até 3 anúncios
-2. **Dealer (Loja)** - Limite personalizável (padrão 10-20 anúncios)
+1. **Vendedor Individual** - Plano Anúncio Único (1 anúncio, R$49)
+2. **Lojista/Revendedor** - Plano Lojista (20 anúncios, R$149)
 3. **Administrador** - Gerencia todo o marketplace
+
+## Planos de Assinatura
+
+| Plano | Limite | Preço | 1ª Parcela | Validade |
+|-------|--------|-------|------------|----------|
+| Anúncio Único | 1 | R$49 | R$49 | 3 meses |
+| Lojista | 20 | R$149 | R$97 | 3 meses |
 
 ## Funcionalidades Implementadas
 
-### ✅ Autenticação
+### ✅ Sistema de Aprovação Manual
+- Todos os cadastros passam por aprovação (Google OAuth e email/senha)
+- Status: `pending_approval` → `active` ou `rejected`
+- Usuário bloqueado de criar anúncios até aprovação
+- Dashboard mostra mensagem de aguardando validação
+
+### ✅ Painel Admin - Leads
+- Nova aba "Leads" no painel admin
+- Lista usuários aguardando contato
+- Filtros: aguardando / contatados
+- Ações: marcar contatado, aprovar usuário direto
+- WhatsApp clicável para contato rápido
+
+### ✅ Painel Admin - Criar Usuário
+- Modal para criar usuário manualmente
+- Campos: Nome, Email, WhatsApp, Tipo de conta
+- Usuário criado já aprovado (status: active)
+- Senha auto-gerada ou customizada
+- Exibe senha após criação
+
+### ✅ Painel Admin - Usuários Pendentes
+- Seção dedicada para usuários aguardando aprovação
+- Botões de aprovar/rejeitar
+- Exibe plano escolhido e WhatsApp
+
+### ✅ Fluxo de Onboarding com Planos
+- Passo 1: Escolher tipo de conta
+- Passo 2: Escolher plano e informar WhatsApp
+- Passo 3: Mensagem de aguardando validação
+- Redirecionamento para completar perfil
+
+### ✅ Página Editar Perfil
+- Rota: `/perfil/editar`
+- Campos: foto, nome, WhatsApp, bio, endereço, nome da loja
+- Upload de foto de perfil
+- Integração com storage
+
+### ✅ Autenticação Completa
 - Login via Google (Emergent Auth)
 - Login via Email/Senha
-- Registro de novos usuários
-- Sistema de onboarding (Individual vs Dealer)
+- Registro com validação
+- Sistema de sessões
 
 ### ✅ Sistema de Anúncios
 - CRUD completo de anúncios
-- Upload de imagens (até 10 por anúncio)
-- Compressão automática de imagens
+- Upload de imagens (até 10)
+- Compressão automática
 - Suporte HEIC (iOS)
-- Categorias: Tratores, Implementos, Colheitadeiras, Peças
-- Status: Pendente, Aprovado, Rejeitado, Expirado
 - Destaque de anúncios (featured)
 - Expiração automática (90 dias)
 
-### ✅ Painel Admin
+### ✅ Painel Admin Completo
 - Dashboard com estatísticas
-- Gestão de anúncios (aprovar/rejeitar/editar/deletar/destacar/expirar)
-- Gestão de usuários (limites/promover/admin/deletar)
-- Gestão de dealers (criar/limites/ativar/desativar)
+- Gestão de anúncios
+- Gestão de usuários
+- Gestão de dealers
+- Gestão de leads
 
 ### ✅ SEO
 - Meta tags dinâmicas
-- Títulos otimizados por página
+- Títulos otimizados
 
-### ✅ Integrações
-- WhatsApp (click-to-chat com tracking)
-- Leaflet (mapas de localização)
-- Emergent Storage (upload de arquivos)
+## Implementações desta sessão (29/03/2026)
 
-## O que foi implementado nesta sessão (29/03/2026)
+### Novas Funcionalidades
+1. **Sistema de Aprovação Manual**
+   - Campo `status` em users: pending_approval/active/rejected
+   - Campo `plan_type`, `plan_price`, `plan_expiration_date`
+   - Bloqueio de criação de anúncios para não aprovados
 
-### Correções Aplicadas
-1. **EMERGENT_LLM_KEY configurada** - Upload de imagens funcionando
-2. **Upload Mobile melhorado:**
-   - Removido `capture="environment"` que causava problemas
-   - Timeout aumentado para 60s
-   - Tratamento de arquivos sem tipo definido (comum em iOS)
-   - Compressão ativa para arquivos > 500KB
-   - Melhor tratamento de erros com mensagens claras
+2. **Aba Leads no Admin**
+   - GET /api/admin/leads
+   - PUT /api/admin/leads/{user_id}/contacted
 
-3. **Painel Admin verificado e funcionando:**
-   - Todas as funcionalidades estão conectadas ao UI
-   - Editar anúncios ✓
-   - Alterar limites de usuários ✓
-   - Promover para dealer/admin ✓
-   - Destacar anúncios ✓
-   - Expirar anúncios manualmente ✓
+3. **Aprovar/Rejeitar Usuários**
+   - POST /api/admin/users/{user_id}/approve
+   - POST /api/admin/users/{user_id}/reject
+   - GET /api/admin/users/pending
 
-4. **Fluxo de troca de senha admin melhorado**
-   - Atualiza estado do contexto após troca de senha
+4. **Criar Usuário Manual**
+   - POST /api/admin/users/create
+
+5. **Planos de Assinatura**
+   - GET /api/plans
+   - POST /api/user/select-plan
+
+6. **Editar Perfil**
+   - PUT /api/user/profile
+   - POST /api/user/profile/photo
+   - Página /perfil/editar
+
+7. **Onboarding com Planos**
+   - Fluxo em 3 passos
+   - Escolha de plano
+   - Mensagem de aguardando validação
 
 ## Backlog / Próximos Passos
 
 ### P0 - Crítico
-- [x] Upload mobile funcional
-- [x] Painel admin completo
+- [x] Aprovação manual de usuários
+- [x] Painel Admin - Leads
+- [x] Criar usuário manual
+- [x] Planos de assinatura
 
 ### P1 - Importante
 - [ ] Notificações por email (anúncio aprovado/rejeitado)
-- [ ] Recuperação de senha
-- [ ] Dashboard do vendedor com analytics
+- [ ] Integração de pagamento (PIX/Stripe)
+- [ ] Expiração automática de planos
+- [ ] Relatórios de vendas
 
 ### P2 - Melhorias
+- [ ] Dashboard do vendedor com analytics
 - [ ] Sistema de favoritos
 - [ ] Comparador de máquinas
 - [ ] Chat interno
-- [ ] Histórico de preços
 
 ### P3 - Futuro
 - [ ] App mobile (React Native)
