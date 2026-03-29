@@ -9,137 +9,89 @@
 - **Auth:** Emergent Auth (Google OAuth + Email/Senha)
 - **Storage:** Object Storage (Emergent Storage API)
 
-## Personas
-1. **Vendedor Individual** - Plano Anúncio Único (1 anúncio, R$49)
-2. **Lojista/Revendedor** - Plano Lojista (20 anúncios, R$149)
-3. **Administrador** - Gerencia todo o marketplace
-
-## Planos de Assinatura
+## Planos de Assinatura (Trimestrais - 90 dias)
 
 | Plano | Limite | Preço | 1ª Parcela | Validade |
 |-------|--------|-------|------------|----------|
-| Anúncio Único | 1 | R$49 | R$49 | 3 meses |
-| Lojista | 20 | R$149 | R$97 | 3 meses |
+| Anúncio Único | 1 | R$49 | R$49 | 3 meses (trimestral) |
+| Lojista | 20 | R$149 | R$97 | 3 meses (trimestral) |
 
-## Funcionalidades Implementadas
+## Correções Aplicadas (29/03/2026 - Sessão 2)
 
-### ✅ Sistema de Aprovação Manual
-- Todos os cadastros passam por aprovação (Google OAuth e email/senha)
-- Status: `pending_approval` → `active` ou `rejected`
-- Usuário bloqueado de criar anúncios até aprovação
-- Dashboard mostra mensagem de aguardando validação
+### 1️⃣ Planos - Texto "Trimestral"
+- ✅ Adicionado "trimestral" nos textos de planos
+- ✅ Texto "válido por 3 meses" na escolha de planos
+- ✅ "pagamento trimestral" no card do plano
 
-### ✅ Painel Admin - Leads
-- Nova aba "Leads" no painel admin
-- Lista usuários aguardando contato
-- Filtros: aguardando / contatados
-- Ações: marcar contatado, aprovar usuário direto
-- WhatsApp clicável para contato rápido
+### 2️⃣ Bug Duplicação de Anúncios
+- ✅ Verificação de idempotência no backend (30 segundos)
+- ✅ Proteção `if (loading) return;` no frontend
+- ✅ Retorna anúncio existente se duplicado
 
-### ✅ Painel Admin - Criar Usuário
-- Modal para criar usuário manualmente
-- Campos: Nome, Email, WhatsApp, Tipo de conta
-- Usuário criado já aprovado (status: active)
-- Senha auto-gerada ou customizada
-- Exibe senha após criação
+### 3️⃣ Upload de Foto de Perfil
+- ✅ Corrigido para usar `put_object` (igual anúncios)
+- ✅ Salva caminho no campo `picture` do usuário
+- ✅ Funciona com storage Emergent
 
-### ✅ Painel Admin - Usuários Pendentes
-- Seção dedicada para usuários aguardando aprovação
-- Botões de aprovar/rejeitar
-- Exibe plano escolhido e WhatsApp
+### 4️⃣ Página Pública do Vendedor
+- ✅ Rota: `/vendedor/{userId}`
+- ✅ SEO-friendly e indexável
+- ✅ Mostra: foto, nome, bio, endereço, anúncios
+- ✅ Botão WhatsApp
+- ✅ Botão Compartilhar (copia link)
+- ✅ Endpoint: `GET /api/vendedor/{user_id}`
 
-### ✅ Fluxo de Onboarding com Planos
-- Passo 1: Escolher tipo de conta
-- Passo 2: Escolher plano e informar WhatsApp
-- Passo 3: Mensagem de aguardando validação
-- Redirecionamento para completar perfil
+### 5️⃣ Limite Lojista = 20
+- ✅ Corrigido de 10 para 20 no backend
+- ✅ `dealer_profile.max_listings = 20`
 
-### ✅ Página Editar Perfil
-- Rota: `/perfil/editar`
-- Campos: foto, nome, WhatsApp, bio, endereço, nome da loja
-- Upload de foto de perfil
-- Integração com storage
+### 6️⃣ Filtro Estado do Produto
+- ✅ Filtros: Todos, Novo, Semi-novo, Usado
+- ✅ Adicionado na SearchPage
+- ✅ Backend: `GET /api/listings?condition=novo`
 
-### ✅ Autenticação Completa
-- Login via Google (Emergent Auth)
-- Login via Email/Senha
-- Registro com validação
-- Sistema de sessões
+### 7️⃣ Admin - Fotos na Aprovação
+- ✅ Fotos visíveis em cada anúncio
+- ✅ Botão X para excluir foto individual
+- ✅ `DELETE /api/listings/{id}/images/{index}`
 
-### ✅ Sistema de Anúncios
-- CRUD completo de anúncios
-- Upload de imagens (até 10)
-- Compressão automática
-- Suporte HEIC (iOS)
-- Destaque de anúncios (featured)
-- Expiração automática (90 dias)
+### 8️⃣ Admin - Notificação de Pendentes
+- ✅ Badge numérico no header
+- ✅ Mostra quantidade de usuários pendentes
+- ✅ Clicável para ir à aba de usuários
 
-### ✅ Painel Admin Completo
+## Funcionalidades Completas
+
+### Sistema de Aprovação Manual
+- Status: `pending_approval` → `active` / `rejected`
+- Dashboard mostra aviso "em análise"
+- Bloqueio de criação de anúncios até aprovação
+
+### Painel Admin
 - Dashboard com estatísticas
-- Gestão de anúncios
-- Gestão de usuários
-- Gestão de dealers
-- Gestão de leads
+- Aba Leads (contatos pendentes)
+- Aba Anúncios (com fotos e exclusão individual)
+- Aba Usuários (com pendentes em destaque)
+- Aba Dealers
+- Criar usuário manualmente
+- Badge de notificação
 
-### ✅ SEO
-- Meta tags dinâmicas
-- Títulos otimizados
+### Páginas Públicas
+- `/vendedor/{userId}` - Perfil do vendedor
+- `/loja/{slug}` - Página da loja (dealers)
 
-## Implementações desta sessão (29/03/2026)
-
-### Novas Funcionalidades
-1. **Sistema de Aprovação Manual**
-   - Campo `status` em users: pending_approval/active/rejected
-   - Campo `plan_type`, `plan_price`, `plan_expiration_date`
-   - Bloqueio de criação de anúncios para não aprovados
-
-2. **Aba Leads no Admin**
-   - GET /api/admin/leads
-   - PUT /api/admin/leads/{user_id}/contacted
-
-3. **Aprovar/Rejeitar Usuários**
-   - POST /api/admin/users/{user_id}/approve
-   - POST /api/admin/users/{user_id}/reject
-   - GET /api/admin/users/pending
-
-4. **Criar Usuário Manual**
-   - POST /api/admin/users/create
-
-5. **Planos de Assinatura**
-   - GET /api/plans
-   - POST /api/user/select-plan
-
-6. **Editar Perfil**
-   - PUT /api/user/profile
-   - POST /api/user/profile/photo
-   - Página /perfil/editar
-
-7. **Onboarding com Planos**
-   - Fluxo em 3 passos
-   - Escolha de plano
-   - Mensagem de aguardando validação
-
-## Backlog / Próximos Passos
-
-### P0 - Crítico
-- [x] Aprovação manual de usuários
-- [x] Painel Admin - Leads
-- [x] Criar usuário manual
-- [x] Planos de assinatura
+## Backlog
 
 ### P1 - Importante
-- [ ] Notificações por email (anúncio aprovado/rejeitado)
 - [ ] Integração de pagamento (PIX/Stripe)
+- [ ] Notificações por email
 - [ ] Expiração automática de planos
-- [ ] Relatórios de vendas
 
 ### P2 - Melhorias
-- [ ] Dashboard do vendedor com analytics
+- [ ] Dashboard analytics para vendedor
 - [ ] Sistema de favoritos
-- [ ] Comparador de máquinas
 - [ ] Chat interno
 
 ### P3 - Futuro
-- [ ] App mobile (React Native)
-- [ ] Integração com financiamento
+- [ ] App mobile
 - [ ] Sistema de avaliações
