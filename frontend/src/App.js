@@ -8,7 +8,7 @@ import {
   Plus, LogOut, User, Settings, Tractor, Wrench, Cog, Loader2,
   ChevronLeft, MessageCircle, Share2, Heart, Filter, Grid, List,
   Upload, Image as ImageIcon, Trash2, Edit, Camera, Shield, Lock, Mail,
-  Store, Users, Building2, Package, Check
+  Store, Users, Building2, Package, Check, Instagram
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -443,6 +443,20 @@ const Footer = () => (
             Dúvidas ou sugestões?<br />
             contato@tratorshop.com.br
           </p>
+          
+          {/* Redes Sociais */}
+          <div className="mt-4 flex items-center gap-3">
+            <a 
+              href="https://www.instagram.com/tratorshop?igsh=MXNzcjQ3cnFlaGdnaQ==" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors"
+              data-testid="footer-instagram"
+            >
+              <Instagram className="w-5 h-5 text-white" />
+            </a>
+          </div>
+          
           <div className="mt-4 pt-4 border-t border-white/10">
             <Link to="/admin-login" className="text-white/50 hover:text-white text-xs flex items-center gap-1" data-testid="footer-admin-link">
               <Shield className="w-3 h-3" />
