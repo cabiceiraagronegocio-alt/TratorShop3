@@ -95,6 +95,16 @@ class UserBase(BaseModel):
     picture: Optional[str] = None
     is_admin: bool = False
     created_at: str
+    # New fields for approval system
+    status: str = "pending_approval"  # pending_approval, active, rejected
+    phone: Optional[str] = None
+    bio: Optional[str] = None
+    address: Optional[str] = None
+    store_name: Optional[str] = None
+    # Plan fields
+    plan_type: Optional[str] = None  # "anuncio_unico" or "lojista"
+    plan_price: Optional[float] = None
+    plan_expiration_date: Optional[str] = None
 
 class UserCreate(BaseModel):
     email: str
@@ -230,6 +240,30 @@ class UserOnboarding(BaseModel):
     account_type: str  # "individual" or "dealer"
     store_name: Optional[str] = None  # Required if dealer
 
+# User Profile Update Model
+class UserProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    bio: Optional[str] = None
+    address: Optional[str] = None
+    store_name: Optional[str] = None
+
+# Plan Selection Model
+class PlanSelection(BaseModel):
+    plan_type: str  # "anuncio_unico" or "lojista"
+
+# Admin Create User Model
+class AdminCreateUser(BaseModel):
+    name: str
+    email: str
+    phone: str
+    account_type: str  # "anuncio_unico" or "lojista"
+    password: Optional[str] = None  # Optional, will generate if not provided
+
+# Lead Status Update Model
+class LeadStatusUpdate(BaseModel):
+    contacted: bool
+
 # Admin User Management Models
 class AdminUpdateUser(BaseModel):
     name: Optional[str] = None
@@ -317,8 +351,8 @@ async def require_user(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return user
 
-async def require_admin(request: Request) -> dict:
-    """Require admin user"""
+async def require_user_admin(request: Request) -> dict:
+    """Require user with admin privileges"""
     user = await require_user(request)
     if not user.get("is_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -363,15 +397,40 @@ async def exchange_session(request: Request):
         )
     else:
         user_id = f"user_{uuid.uuid4().hex[:12]}"
+        now = datetime.now(timezone.utc).isoformat()
         user_doc = {
             "user_id": user_id,
             "email": email,
             "name": name,
             "picture": picture,
             "is_admin": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "role": "user",
+            "status": "pending_approval",
+            "phone": None,
+            "bio": None,
+            "address": None,
+            "store_name": None,
+            "plan_type": None,
+            "plan_price": None,
+            "plan_expiration_date": None,
+            "max_listings": 3,
+            "created_at": now
         }
         await db.users.insert_one(user_doc)
+        
+        # Create lead entry for new Google OAuth user
+        lead_doc = {
+            "lead_id": f"lead_{uuid.uuid4().hex[:12]}",
+            "user_id": user_id,
+            "name": name,
+            "email": email,
+            "phone": None,
+            "plan_type": None,
+            "plan_price": None,
+            "status": "aguardando",
+            "created_at": now
+        }
+        await db.leads.insert_one(lead_doc)
     
     # Store session
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)
@@ -452,8 +511,9 @@ async def register_user(data: UserRegister):
     if len(data.password) < 6:
         raise HTTPException(status_code=400, detail="Senha deve ter pelo menos 6 caracteres")
     
-    # Create new user
+    # Create new user with pending_approval status
     user_id = f"user_{uuid.uuid4().hex[:12]}"
+    now = datetime.now(timezone.utc).isoformat()
     user_doc = {
         "user_id": user_id,
         "email": data.email.lower(),
@@ -462,9 +522,32 @@ async def register_user(data: UserRegister):
         "picture": None,
         "is_admin": False,
         "role": "user",
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "status": "pending_approval",
+        "phone": None,
+        "bio": None,
+        "address": None,
+        "store_name": None,
+        "plan_type": None,
+        "plan_price": None,
+        "plan_expiration_date": None,
+        "max_listings": 3,
+        "created_at": now
     }
     await db.users.insert_one(user_doc)
+    
+    # Create lead entry
+    lead_doc = {
+        "lead_id": f"lead_{uuid.uuid4().hex[:12]}",
+        "user_id": user_id,
+        "name": data.name,
+        "email": data.email.lower(),
+        "phone": None,
+        "plan_type": None,
+        "plan_price": None,
+        "status": "aguardando",  # aguardando, contatado
+        "created_at": now
+    }
+    await db.leads.insert_one(lead_doc)
     
     # Return user without password_hash and _id
     response_user = {
@@ -474,6 +557,7 @@ async def register_user(data: UserRegister):
         "picture": None,
         "is_admin": False,
         "role": "user",
+        "status": "pending_approval",
         "created_at": user_doc["created_at"]
     }
     
@@ -521,6 +605,147 @@ async def login_user(data: UserLogin):
         max_age=7 * 24 * 60 * 60
     )
     return response
+
+# =============================================================================
+# USER PROFILE & PLAN ROUTES
+# =============================================================================
+
+# Plan configurations
+PLANS = {
+    "anuncio_unico": {
+        "name": "Anúncio Único",
+        "max_listings": 1,
+        "price": 49.00,
+        "first_payment": 49.00,
+        "validity_days": 90
+    },
+    "lojista": {
+        "name": "Lojista",
+        "max_listings": 20,
+        "price": 149.00,
+        "first_payment": 97.00,
+        "validity_days": 90
+    }
+}
+
+@api_router.get("/plans")
+async def get_plans():
+    """Get available plans"""
+    return {"plans": PLANS}
+
+@api_router.post("/user/select-plan")
+async def select_plan(data: PlanSelection, request: Request):
+    """Select a plan for the user"""
+    user = await require_user(request)
+    
+    if data.plan_type not in PLANS:
+        raise HTTPException(status_code=400, detail="Plano inválido")
+    
+    plan = PLANS[data.plan_type]
+    now = datetime.now(timezone.utc)
+    expiration_date = now + timedelta(days=plan["validity_days"])
+    
+    # Update user with plan info
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {
+            "plan_type": data.plan_type,
+            "plan_price": plan["price"],
+            "plan_expiration_date": expiration_date.isoformat(),
+            "max_listings": plan["max_listings"]
+        }}
+    )
+    
+    # Update lead with plan info
+    await db.leads.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {
+            "plan_type": data.plan_type,
+            "plan_price": plan["price"]
+        }}
+    )
+    
+    return {
+        "message": "Plano selecionado com sucesso",
+        "plan": plan,
+        "expiration_date": expiration_date.isoformat()
+    }
+
+@api_router.put("/user/profile")
+async def update_user_profile(data: UserProfileUpdate, request: Request):
+    """Update user profile"""
+    user = await require_user(request)
+    
+    update_data = {}
+    if data.name is not None:
+        update_data["name"] = data.name
+    if data.phone is not None:
+        update_data["phone"] = data.phone
+        # Also update lead phone
+        await db.leads.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"phone": data.phone}}
+        )
+    if data.bio is not None:
+        update_data["bio"] = data.bio
+    if data.address is not None:
+        update_data["address"] = data.address
+    if data.store_name is not None:
+        update_data["store_name"] = data.store_name
+    
+    if update_data:
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": update_data}
+        )
+    
+    # Return updated user
+    updated_user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "password_hash": 0})
+    return updated_user
+
+@api_router.post("/user/profile/photo")
+async def upload_profile_photo(request: Request, file: UploadFile = File(...)):
+    """Upload user profile photo"""
+    user = await require_user(request)
+    
+    if not STORAGE_URL:
+        raise HTTPException(status_code=500, detail="Storage not available")
+    
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only images are allowed")
+    
+    # Read file content
+    content = await file.read()
+    
+    # Generate unique filename
+    ext = file.filename.split(".")[-1] if file.filename else "jpg"
+    filename = f"profile_{user['user_id']}_{uuid.uuid4().hex[:8]}.{ext}"
+    
+    # Upload to storage
+    try:
+        files = {"file": (filename, content, file.content_type)}
+        data = {"path": f"profiles/{filename}"}
+        resp = requests.post(
+            f"{STORAGE_URL}/upload",
+            files=files,
+            data=data,
+            timeout=60
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        photo_url = result.get("url")
+        
+        # Update user picture
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"picture": photo_url}}
+        )
+        
+        return {"url": photo_url}
+    except Exception as e:
+        logger.error(f"Profile photo upload failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload photo")
 
 # =============================================================================
 # ADMIN AUTH ROUTES
@@ -768,12 +993,20 @@ async def get_user_profile(request: Request):
         "email": user["email"],
         "name": user["name"],
         "picture": user.get("picture"),
+        "phone": user.get("phone"),
+        "bio": user.get("bio"),
+        "address": user.get("address"),
+        "store_name": user.get("store_name"),
         "role": user.get("role", "user"),
-        "account_type": user.get("account_type"),  # "individual" or "dealer"
+        "status": user.get("status", "pending_approval"),
+        "account_type": user.get("account_type"),
         "onboarding_complete": user.get("onboarding_complete", False),
         "is_admin": user.get("is_admin", False),
         "max_listings": max_listings,
         "active_listings": active_count,
+        "plan_type": user.get("plan_type"),
+        "plan_price": user.get("plan_price"),
+        "plan_expiration_date": user.get("plan_expiration_date"),
         "dealer_profile": user.get("dealer_profile") if user.get("role") == "dealer" else None
     }
 
@@ -972,6 +1205,13 @@ async def get_admin_stats(request: Request):
     total_users = await db.users.count_documents({})
     total_dealers = await db.users.count_documents({"role": "dealer"})
     total_individuals = await db.users.count_documents({"role": {"$ne": "dealer"}})
+    pending_users = await db.users.count_documents({"status": "pending_approval"})
+    active_users = await db.users.count_documents({"status": "active"})
+    
+    # Count leads
+    total_leads = await db.leads.count_documents({})
+    leads_aguardando = await db.leads.count_documents({"status": "aguardando"})
+    leads_contatados = await db.leads.count_documents({"status": "contatado"})
     
     # Count listings
     total_listings = await db.listings.count_documents({})
@@ -995,7 +1235,14 @@ async def get_admin_stats(request: Request):
             "total": total_users,
             "dealers": total_dealers,
             "individuals": total_individuals,
+            "pending_approval": pending_users,
+            "active": active_users,
             "new_this_week": new_users_week
+        },
+        "leads": {
+            "total": total_leads,
+            "aguardando": leads_aguardando,
+            "contatados": leads_contatados
         },
         "listings": {
             "total": total_listings,
@@ -1297,8 +1544,16 @@ async def get_listing(listing_id: str):
 
 @api_router.post("/listings")
 async def create_listing(listing: ListingCreate, request: Request):
-    """Create new listing (requires auth)"""
+    """Create new listing (requires auth and approval)"""
     user = await require_user(request)
+    
+    # Check if user is approved
+    user_status = user.get("status", "pending_approval")
+    if user_status != "active":
+        raise HTTPException(
+            status_code=403, 
+            detail="Seu cadastro ainda está em análise. Aguarde a aprovação do administrador para criar anúncios."
+        )
     
     # Check listing limit based on user type
     current_count = await db.listings.count_documents({
@@ -1610,6 +1865,171 @@ async def get_user_listings(user_id: str, request: Request):
         },
         "listings": listings,
         "total": len(listings)
+    }
+
+# =============================================================================
+# ADMIN - LEADS MANAGEMENT
+# =============================================================================
+
+@api_router.get("/admin/leads")
+async def get_leads(request: Request, status: Optional[str] = None):
+    """Get all leads (admin only)"""
+    await require_admin(request)
+    
+    query = {}
+    if status:
+        query["status"] = status
+    
+    leads = await db.leads.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return leads
+
+@api_router.put("/admin/leads/{user_id}/contacted")
+async def mark_lead_contacted(user_id: str, data: LeadStatusUpdate, request: Request):
+    """Mark lead as contacted (admin only)"""
+    await require_admin(request)
+    
+    new_status = "contatado" if data.contacted else "aguardando"
+    
+    result = await db.leads.update_one(
+        {"user_id": user_id},
+        {"$set": {"status": new_status, "contacted_at": datetime.now(timezone.utc).isoformat() if data.contacted else None}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    return {"message": f"Lead marcado como {new_status}"}
+
+@api_router.get("/admin/users/pending")
+async def get_pending_users(request: Request):
+    """Get users pending approval (admin only)"""
+    await require_admin(request)
+    
+    users = await db.users.find(
+        {"status": "pending_approval"},
+        {"_id": 0, "password_hash": 0}
+    ).sort("created_at", -1).to_list(1000)
+    
+    return users
+
+@api_router.post("/admin/users/{user_id}/approve")
+async def approve_user(user_id: str, request: Request):
+    """Approve a pending user (admin only)"""
+    await require_admin(request)
+    
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update user status
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "status": "active",
+            "approved_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Update lead status
+    await db.leads.update_one(
+        {"user_id": user_id},
+        {"$set": {"status": "aprovado"}}
+    )
+    
+    return {"message": "Usuário aprovado com sucesso"}
+
+@api_router.post("/admin/users/{user_id}/reject")
+async def reject_user(user_id: str, request: Request):
+    """Reject a pending user (admin only)"""
+    await require_admin(request)
+    
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update user status
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "status": "rejected",
+            "rejected_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Update lead status
+    await db.leads.update_one(
+        {"user_id": user_id},
+        {"$set": {"status": "rejeitado"}}
+    )
+    
+    return {"message": "Usuário rejeitado"}
+
+@api_router.post("/admin/users/create")
+async def admin_create_user(data: AdminCreateUser, request: Request):
+    """Create a new user (admin only) - already approved"""
+    await require_admin(request)
+    
+    # Check if email already exists
+    existing = await db.users.find_one({"email": data.email.lower()})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email já cadastrado")
+    
+    # Determine plan settings
+    if data.account_type not in PLANS:
+        raise HTTPException(status_code=400, detail="Tipo de conta inválido")
+    
+    plan = PLANS[data.account_type]
+    now = datetime.now(timezone.utc)
+    expiration_date = now + timedelta(days=plan["validity_days"])
+    
+    # Generate password if not provided
+    password = data.password if data.password else secrets.token_urlsafe(8)
+    
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
+    user_doc = {
+        "user_id": user_id,
+        "email": data.email.lower(),
+        "name": data.name,
+        "password_hash": hash_password(password),
+        "phone": data.phone,
+        "picture": None,
+        "is_admin": False,
+        "role": "dealer" if data.account_type == "lojista" else "user",
+        "status": "active",  # Admin-created users are already active
+        "bio": None,
+        "address": None,
+        "store_name": data.name if data.account_type == "lojista" else None,
+        "plan_type": data.account_type,
+        "plan_price": plan["price"],
+        "plan_expiration_date": expiration_date.isoformat(),
+        "max_listings": plan["max_listings"],
+        "approved_at": now.isoformat(),
+        "created_at": now.isoformat()
+    }
+    await db.users.insert_one(user_doc)
+    
+    # Create dealer profile if lojista
+    if data.account_type == "lojista":
+        dealer_doc = {
+            "user_id": user_id,
+            "store_name": data.name,
+            "store_slug": data.name.lower().replace(" ", "-"),
+            "store_logo": None,
+            "whatsapp": data.phone,
+            "city": "",
+            "description": None,
+            "max_listings": plan["max_listings"],
+            "is_active": True,
+            "created_at": now.isoformat()
+        }
+        await db.dealers.insert_one(dealer_doc)
+    
+    return {
+        "message": "Usuário criado com sucesso",
+        "user_id": user_id,
+        "email": data.email.lower(),
+        "password": password,  # Return password so admin can share with user
+        "plan": plan
     }
 
 # =============================================================================

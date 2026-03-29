@@ -313,6 +313,10 @@ const Header = () => {
                     <User className="w-4 h-4 mr-2" />
                     Meus Anúncios
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/perfil/editar')} data-testid="menu-edit-profile">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Editar Perfil
+                  </DropdownMenuItem>
                   {user.role === 'dealer' && user.dealer_profile?.store_slug && (
                     <DropdownMenuItem onClick={() => navigate(`/loja/${user.dealer_profile.store_slug}`)} data-testid="menu-my-store">
                       <Store className="w-4 h-4 mr-2" />
@@ -1857,8 +1861,10 @@ const OnboardingPage = () => {
   const navigate = useNavigate();
   const [accountType, setAccountType] = useState('');
   const [storeName, setStoreName] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(true);
+  const [step, setStep] = useState(1); // 1: type selection, 2: plan selection, 3: confirmation
 
   useEffect(() => {
     // Check if user needs onboarding
@@ -1875,6 +1881,8 @@ const OnboardingPage = () => {
           navigate('/dashboard');
           return;
         }
+        // Pre-fill phone if available
+        if (res.data.phone) setPhone(res.data.phone);
       } catch (error) {
         console.error("Error checking profile:", error);
         navigate('/login');
@@ -1886,32 +1894,32 @@ const OnboardingPage = () => {
     checkOnboarding();
   }, [user, navigate]);
 
-  const handleSubmit = async () => {
-    if (!accountType) {
-      toast.error("Selecione um tipo de conta");
-      return;
-    }
-    
-    if (accountType === 'dealer' && !storeName.trim()) {
-      toast.error("Nome da loja é obrigatório");
-      return;
-    }
-
+  const handleSelectPlan = async (planType) => {
     setLoading(true);
     try {
+      // First save phone if provided
+      if (phone) {
+        await axios.put(`${API}/user/profile`, { phone }, { withCredentials: true });
+      }
+
+      // Select the plan
+      await axios.post(`${API}/user/select-plan`, { plan_type: planType }, { withCredentials: true });
+      
+      // Complete onboarding
       const res = await axios.post(
         `${API}/user/onboarding`,
         { 
-          account_type: accountType,
-          store_name: accountType === 'dealer' ? storeName : null
+          account_type: planType === 'lojista' ? 'dealer' : 'individual',
+          store_name: planType === 'lojista' ? storeName : null
         },
         { withCredentials: true }
       );
       setUser(res.data);
-      toast.success("Perfil configurado com sucesso!");
-      navigate('/dashboard');
+      
+      // Go to confirmation step
+      setStep(3);
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Erro ao configurar perfil");
+      toast.error(error.response?.data?.detail || "Erro ao configurar plano");
     } finally {
       setLoading(false);
     }
@@ -1925,6 +1933,188 @@ const OnboardingPage = () => {
     );
   }
 
+  // Step 3: Confirmation (Pending Approval)
+  if (step === 3) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#1A4D2E] to-[#0d2617] flex items-center justify-center py-12 px-4">
+        <SEOHead title="Cadastro Realizado" />
+        
+        <Card className="w-full max-w-lg shadow-2xl">
+          <CardHeader className="text-center pb-2">
+            <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-12 h-12 text-amber-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900" style={{ fontFamily: 'Outfit' }}>
+              Aguardando Validação
+            </h1>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <p className="text-slate-600">
+              Seu cadastro foi realizado com sucesso!
+            </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-amber-800 font-medium">
+                Nossa equipe entrará em contato via WhatsApp para finalizar seu cadastro.
+              </p>
+            </div>
+            <p className="text-sm text-slate-500">
+              Enquanto isso, você pode explorar o site e completar seu perfil.
+            </p>
+            <div className="pt-4 space-y-3">
+              <Button
+                onClick={() => navigate('/perfil/editar')}
+                className="w-full bg-[#1A4D2E] hover:bg-[#143d24]"
+              >
+                Completar Perfil
+              </Button>
+              <Button
+                onClick={() => navigate('/dashboard')}
+                variant="outline"
+                className="w-full"
+              >
+                Ir para Dashboard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Step 2: Plan Selection
+  if (step === 2) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#1A4D2E] to-[#0d2617] flex items-center justify-center py-12 px-4">
+        <SEOHead title="Escolha seu Plano" />
+        
+        <Card className="w-full max-w-2xl shadow-2xl">
+          <CardHeader className="text-center pb-2">
+            <h1 className="text-2xl font-bold text-[#1A4D2E]" style={{ fontFamily: 'Outfit' }}>
+              Escolha seu Plano
+            </h1>
+            <p className="text-slate-500">
+              Selecione o plano ideal para você
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Phone Input */}
+            <div className="mb-6">
+              <Label className="text-base font-medium">Seu WhatsApp (para contato)</Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="(67) 99999-9999"
+                className="mt-2 py-5 text-lg"
+              />
+            </div>
+
+            {/* Store Name for Lojista */}
+            {accountType === 'dealer' && (
+              <div className="mb-6">
+                <Label className="text-base font-medium">Nome da sua Loja</Label>
+                <Input
+                  value={storeName}
+                  onChange={(e) => setStoreName(e.target.value)}
+                  placeholder="Ex: Tratores do Sul"
+                  className="mt-2 py-5 text-lg"
+                />
+              </div>
+            )}
+
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Plano Anúncio Único */}
+              <button
+                onClick={() => handleSelectPlan('anuncio_unico')}
+                disabled={loading}
+                className="p-6 rounded-xl border-2 border-blue-200 bg-blue-50 hover:border-blue-400 hover:shadow-lg transition-all text-left"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                    <User className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-slate-900">Anúncio Único</h3>
+                    <p className="text-sm text-slate-500">Para vendas pontuais</p>
+                  </div>
+                </div>
+                <div className="space-y-2 mb-4">
+                  <p className="flex items-center gap-2 text-slate-700">
+                    <Check className="w-4 h-4 text-green-500" />
+                    1 anúncio ativo
+                  </p>
+                  <p className="flex items-center gap-2 text-slate-700">
+                    <Check className="w-4 h-4 text-green-500" />
+                    Validade: 3 meses
+                  </p>
+                </div>
+                <div className="pt-4 border-t">
+                  <p className="text-3xl font-bold text-blue-600">R$ 49</p>
+                  <p className="text-sm text-slate-500">pagamento único</p>
+                </div>
+              </button>
+
+              {/* Plano Lojista */}
+              <button
+                onClick={() => {
+                  if (accountType !== 'dealer' || !storeName.trim()) {
+                    toast.error("Preencha o nome da loja primeiro");
+                    return;
+                  }
+                  handleSelectPlan('lojista');
+                }}
+                disabled={loading || (accountType === 'dealer' && !storeName.trim())}
+                className="p-6 rounded-xl border-2 border-[#F9C02D] bg-[#F9C02D]/10 hover:shadow-lg transition-all text-left relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 bg-[#F9C02D] text-[#1A4D2E] px-3 py-1 text-xs font-bold rounded-bl-lg">
+                  POPULAR
+                </div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-[#F9C02D] rounded-xl flex items-center justify-center">
+                    <Store className="w-6 h-6 text-[#1A4D2E]" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-slate-900">Lojista</h3>
+                    <p className="text-sm text-slate-500">Para revendedores</p>
+                  </div>
+                </div>
+                <div className="space-y-2 mb-4">
+                  <p className="flex items-center gap-2 text-slate-700">
+                    <Check className="w-4 h-4 text-green-500" />
+                    Até 20 anúncios ativos
+                  </p>
+                  <p className="flex items-center gap-2 text-slate-700">
+                    <Check className="w-4 h-4 text-green-500" />
+                    Página exclusiva da loja
+                  </p>
+                  <p className="flex items-center gap-2 text-slate-700">
+                    <Check className="w-4 h-4 text-green-500" />
+                    Validade: 3 meses
+                  </p>
+                </div>
+                <div className="pt-4 border-t">
+                  <p className="text-3xl font-bold text-[#1A4D2E]">R$ 149</p>
+                  <p className="text-sm text-slate-500">
+                    <span className="line-through">R$ 149</span> 1ª parcela: <span className="text-green-600 font-bold">R$ 97</span>
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <Button
+              variant="ghost"
+              onClick={() => setStep(1)}
+              className="w-full mt-4"
+            >
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              Voltar
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Step 1: Account Type Selection
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1A4D2E] to-[#0d2617] flex items-center justify-center py-12 px-4" data-testid="onboarding-page">
       <SEOHead title="Complete seu Cadastro" />
@@ -1966,10 +2156,10 @@ const OnboardingPage = () => {
                 </p>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant="secondary" className="bg-slate-100 text-slate-600">
-                    Até 3 anúncios
+                    1 anúncio
                   </Badge>
-                  <Badge variant="secondary" className="bg-green-100 text-green-700">
-                    Grátis
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                    R$ 49,00
                   </Badge>
                 </div>
               </div>
@@ -2000,10 +2190,10 @@ const OnboardingPage = () => {
                 </p>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <Badge className="bg-[#F9C02D]/20 text-[#1A4D2E]">
-                    Até 10 anúncios
+                    Até 20 anúncios
                   </Badge>
                   <Badge className="bg-[#1A4D2E]/10 text-[#1A4D2E]">
-                    Página exclusiva da loja
+                    R$ 149,00
                   </Badge>
                 </div>
               </div>
@@ -2029,17 +2219,13 @@ const OnboardingPage = () => {
           )}
 
           <Button
-            onClick={handleSubmit}
-            disabled={loading || !accountType}
+            onClick={() => setStep(2)}
+            disabled={!accountType || (accountType === 'dealer' && !storeName.trim())}
             className="w-full bg-[#1A4D2E] hover:bg-[#143d24] py-7 text-lg font-bold mt-6"
             data-testid="onboarding-submit"
           >
-            {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin mr-2" />
-            ) : (
-              <ChevronRight className="w-5 h-5 mr-2" />
-            )}
-            Continuar
+            <ChevronRight className="w-5 h-5 mr-2" />
+            Escolher Plano
           </Button>
           
           <p className="text-center text-xs text-slate-400 pt-2">
@@ -2150,6 +2336,28 @@ const DashboardPage = () => {
       <SEOHead title="Meus Anúncios" />
       
       <div className="max-w-6xl mx-auto px-4 md:px-8">
+        {/* Pending Approval Warning */}
+        {userProfile?.status === 'pending_approval' && (
+          <Card className="mb-6 bg-amber-50 border-amber-200">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-6 h-6 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-amber-800">Cadastro em Análise</h3>
+                  <p className="text-amber-700 mt-1">
+                    Seu cadastro está em análise. Entraremos em contato via WhatsApp para finalizar sua liberação.
+                  </p>
+                  <p className="text-amber-600 text-sm mt-2">
+                    Enquanto isso, você pode completar seu perfil e explorar o site.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Dealer Info Card */}
         {userProfile?.role === 'dealer' && dealerInfo && (
           <Card className="mb-6 bg-gradient-to-r from-[#1A4D2E] to-[#2d6e45] text-white">
@@ -2215,10 +2423,16 @@ const DashboardPage = () => {
             </p>
           </div>
           <Button 
-            onClick={() => navigate('/anunciar')}
+            onClick={() => {
+              if (userProfile?.status === 'pending_approval') {
+                toast.error("Seu cadastro está em análise. Aguarde a aprovação para criar anúncios.");
+                return;
+              }
+              navigate('/anunciar');
+            }}
             className="bg-[#F9C02D] hover:bg-[#f5b00b] text-[#1A4D2E] font-bold"
             data-testid="new-listing-button"
-            disabled={activeListings >= maxListings}
+            disabled={activeListings >= maxListings || userProfile?.status === 'pending_approval'}
           >
             <Plus className="w-4 h-4 mr-2" />
             Novo Anúncio
@@ -2321,6 +2535,210 @@ const DashboardPage = () => {
             </Button>
           </Card>
         )}
+      </div>
+    </div>
+  );
+};
+
+// Edit Profile Page
+const EditProfilePage = () => {
+  const { user, setUser } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [profile, setProfile] = useState({
+    name: '',
+    phone: '',
+    bio: '',
+    address: '',
+    store_name: ''
+  });
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    fetchProfile();
+  }, [user, navigate]);
+
+  const fetchProfile = async () => {
+    try {
+      const res = await axios.get(`${API}/user/profile`, { withCredentials: true });
+      setProfile({
+        name: res.data.name || '',
+        phone: res.data.phone || '',
+        bio: res.data.bio || '',
+        address: res.data.address || '',
+        store_name: res.data.store_name || ''
+      });
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await axios.put(`${API}/user/profile`, profile, { withCredentials: true });
+      setUser(prev => ({ ...prev, ...res.data }));
+      toast.success("Perfil atualizado!");
+      navigate('/dashboard');
+    } catch (error) {
+      toast.error("Erro ao atualizar perfil");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const res = await axios.post(`${API}/user/profile/photo`, formData, {
+        withCredentials: true,
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      setUser(prev => ({ ...prev, picture: res.data.url }));
+      toast.success("Foto atualizada!");
+    } catch (error) {
+      toast.error("Erro ao enviar foto");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 py-8" data-testid="edit-profile-page">
+      <SEOHead title="Editar Perfil" />
+      
+      <div className="max-w-2xl mx-auto px-4">
+        <Card>
+          <CardHeader>
+            <h1 className="text-2xl font-bold text-slate-900" style={{ fontFamily: 'Outfit' }}>
+              Editar Perfil
+            </h1>
+          </CardHeader>
+          <CardContent>
+            {/* Profile Photo */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="relative">
+                <Avatar className="w-20 h-20">
+                  <AvatarImage src={user?.picture} />
+                  <AvatarFallback className="bg-[#1A4D2E] text-white text-2xl">
+                    {user?.name?.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                {uploading && (
+                  <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-white" />
+                  </div>
+                )}
+              </div>
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Alterar Foto
+                </Button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label>Nome</Label>
+                <Input
+                  value={profile.name}
+                  onChange={(e) => setProfile({...profile, name: e.target.value})}
+                  placeholder="Seu nome"
+                  className="mt-1"
+                />
+              </div>
+
+              {user?.role === 'dealer' && (
+                <div>
+                  <Label>Nome da Loja</Label>
+                  <Input
+                    value={profile.store_name}
+                    onChange={(e) => setProfile({...profile, store_name: e.target.value})}
+                    placeholder="Nome da sua loja"
+                    className="mt-1"
+                  />
+                </div>
+              )}
+
+              <div>
+                <Label>WhatsApp</Label>
+                <Input
+                  value={profile.phone}
+                  onChange={(e) => setProfile({...profile, phone: e.target.value})}
+                  placeholder="(67) 99999-9999"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label>Biografia</Label>
+                <Textarea
+                  value={profile.bio}
+                  onChange={(e) => setProfile({...profile, bio: e.target.value})}
+                  placeholder="Conte um pouco sobre você ou sua empresa..."
+                  rows={3}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label>Endereço Completo</Label>
+                <Textarea
+                  value={profile.address}
+                  onChange={(e) => setProfile({...profile, address: e.target.value})}
+                  placeholder="Rua, número, bairro, cidade - UF"
+                  rows={2}
+                  className="mt-1"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate('/dashboard')}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-[#1A4D2E] hover:bg-[#143d24]"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Salvar
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
@@ -2556,9 +2974,12 @@ const AdminPage = () => {
   const [listings, setListings] = useState([]);
   const [users, setUsers] = useState([]);
   const [dealers, setDealers] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [pendingUsers, setPendingUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('pending');
+  const [leadFilter, setLeadFilter] = useState('aguardando');
   const [activeTab, setActiveTab] = useState('dashboard');
   
   // Promote to Dealer Modal
@@ -2587,6 +3008,17 @@ const AdminPage = () => {
   const [showUserListingsModal, setShowUserListingsModal] = useState(false);
   const [userListings, setUserListings] = useState({ user: null, listings: [], total: 0 });
   const [loadingUserListings, setLoadingUserListings] = useState(false);
+
+  // Create User Modal
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [createUserData, setCreateUserData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    account_type: 'anuncio_unico',
+    password: ''
+  });
+  const [creatingUser, setCreatingUser] = useState(false);
 
   useEffect(() => {
     if (!admin) {
@@ -2649,13 +3081,34 @@ const AdminPage = () => {
     }
   };
 
+  const fetchLeads = async () => {
+    try {
+      const res = await axios.get(`${API}/admin/leads?status=${leadFilter}`, { withCredentials: true });
+      setLeads(res.data);
+    } catch (error) {
+      toast.error("Erro ao carregar leads");
+    }
+  };
+
+  const fetchPendingUsers = async () => {
+    try {
+      const res = await axios.get(`${API}/admin/users/pending`, { withCredentials: true });
+      setPendingUsers(res.data);
+    } catch (error) {
+      toast.error("Erro ao carregar usuários pendentes");
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'users') {
       fetchUsers();
+      fetchPendingUsers();
     } else if (activeTab === 'dealers') {
       fetchDealers();
+    } else if (activeTab === 'leads') {
+      fetchLeads();
     }
-  }, [activeTab]);
+  }, [activeTab, leadFilter]);
 
   const handleApprove = async (listingId) => {
     try {
@@ -2729,6 +3182,76 @@ const AdminPage = () => {
       fetchStats();
     } catch (error) {
       toast.error("Erro ao excluir usuário");
+    }
+  };
+
+  // Aprovar usuário pendente
+  const handleApproveUser = async (userId) => {
+    try {
+      await axios.post(`${API}/admin/users/${userId}/approve`, {}, { withCredentials: true });
+      toast.success("Usuário aprovado!");
+      fetchPendingUsers();
+      fetchUsers();
+      fetchStats();
+      fetchLeads();
+    } catch (error) {
+      toast.error("Erro ao aprovar usuário");
+    }
+  };
+
+  // Rejeitar usuário pendente
+  const handleRejectUser = async (userId) => {
+    if (!window.confirm("Tem certeza que deseja rejeitar este usuário?")) return;
+    try {
+      await axios.post(`${API}/admin/users/${userId}/reject`, {}, { withCredentials: true });
+      toast.success("Usuário rejeitado");
+      fetchPendingUsers();
+      fetchUsers();
+      fetchStats();
+      fetchLeads();
+    } catch (error) {
+      toast.error("Erro ao rejeitar usuário");
+    }
+  };
+
+  // Marcar lead como contatado
+  const handleMarkLeadContacted = async (userId, contacted) => {
+    try {
+      await axios.put(`${API}/admin/leads/${userId}/contacted`, { contacted }, { withCredentials: true });
+      toast.success(contacted ? "Lead marcado como contatado" : "Lead marcado como aguardando");
+      fetchLeads();
+      fetchStats();
+    } catch (error) {
+      toast.error("Erro ao atualizar status do lead");
+    }
+  };
+
+  // Criar usuário manualmente
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    if (!createUserData.name || !createUserData.email || !createUserData.phone) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    setCreatingUser(true);
+    try {
+      const res = await axios.post(`${API}/admin/users/create`, createUserData, { withCredentials: true });
+      toast.success(`Usuário criado! Senha: ${res.data.password}`);
+      setShowCreateUserModal(false);
+      setCreateUserData({
+        name: '',
+        email: '',
+        phone: '',
+        account_type: 'anuncio_unico',
+        password: ''
+      });
+      fetchUsers();
+      fetchStats();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Erro ao criar usuário");
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -2964,6 +3487,9 @@ const AdminPage = () => {
             </TabsTrigger>
             <TabsTrigger value="users" className="data-[state=active]:bg-[#1A4D2E]">
               Usuários
+            </TabsTrigger>
+            <TabsTrigger value="leads" className="data-[state=active]:bg-[#1A4D2E]" data-testid="tab-leads">
+              Leads
             </TabsTrigger>
           </TabsList>
 
@@ -3399,13 +3925,86 @@ const AdminPage = () => {
           </TabsContent>
 
           <TabsContent value="users">
+            {/* Pending Users Section */}
+            {pendingUsers.length > 0 && (
+              <Card className="bg-amber-900/30 border-amber-700 mb-6">
+                <CardHeader>
+                  <h2 className="text-lg font-semibold text-amber-400">
+                    ⏳ Aguardando Aprovação ({pendingUsers.length})
+                  </h2>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {pendingUsers.map(user => (
+                      <div key={user.user_id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-700 rounded-lg gap-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={user.picture} />
+                            <AvatarFallback className="bg-amber-600 text-white">
+                              {user.name?.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-white">{user.name}</p>
+                            <p className="text-sm text-slate-400">{user.email}</p>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              {user.phone && (
+                                <span className="text-xs text-green-400">📱 {user.phone}</span>
+                              )}
+                              {user.plan_type && (
+                                <Badge className={user.plan_type === 'lojista' ? 'bg-[#F9C02D] text-[#1A4D2E]' : 'bg-blue-600'}>
+                                  {user.plan_type === 'lojista' ? 'Lojista' : 'Anúncio Único'}
+                                </Badge>
+                              )}
+                              <span className="text-xs text-slate-500">
+                                {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-12 sm:ml-0">
+                          <Button 
+                            size="sm"
+                            onClick={() => handleApproveUser(user.user_id)}
+                            className="bg-green-600 hover:bg-green-700"
+                            data-testid={`approve-user-${user.user_id}`}
+                          >
+                            <Check className="w-4 h-4 mr-1" />
+                            Aprovar
+                          </Button>
+                          <Button 
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRejectUser(user.user_id)}
+                            className="text-red-400 border-red-700 hover:bg-red-900/50"
+                            data-testid={`reject-user-${user.user_id}`}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Rejeitar
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="bg-slate-800 border-slate-700">
-              <CardHeader>
-                <h2 className="text-lg font-semibold text-white">Usuários Registrados ({users.length})</h2>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">Usuários Ativos ({users.filter(u => u.status === 'active' || !u.status).length})</h2>
+                <Button 
+                  onClick={() => setShowCreateUserModal(true)}
+                  className="bg-[#1A4D2E] hover:bg-[#143d24]"
+                  data-testid="create-user-btn"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Criar Usuário
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {users.map(user => (
+                  {users.filter(u => u.status === 'active' || !u.status).map(user => (
                     <div key={user.user_id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-700 rounded-lg gap-3">
                       <div className="flex items-center gap-3">
                         <Avatar>
@@ -3516,6 +4115,116 @@ const AdminPage = () => {
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Leads Tab */}
+          <TabsContent value="leads">
+            <Card className="bg-slate-800 border-slate-700">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">
+                  📞 Leads / Cadastros Pendentes ({leads.length})
+                </h2>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm"
+                    variant={leadFilter === 'aguardando' ? 'default' : 'outline'}
+                    onClick={() => setLeadFilter('aguardando')}
+                    className={leadFilter === 'aguardando' 
+                      ? 'bg-amber-600 hover:bg-amber-700' 
+                      : 'border-slate-600 text-slate-300 hover:bg-slate-700'}
+                  >
+                    Aguardando
+                  </Button>
+                  <Button 
+                    size="sm"
+                    variant={leadFilter === 'contatado' ? 'default' : 'outline'}
+                    onClick={() => setLeadFilter('contatado')}
+                    className={leadFilter === 'contatado' 
+                      ? 'bg-green-600 hover:bg-green-700' 
+                      : 'border-slate-600 text-slate-300 hover:bg-slate-700'}
+                  >
+                    Contatados
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {leads.length === 0 ? (
+                  <p className="text-slate-400 text-center py-8">
+                    Nenhum lead {leadFilter === 'aguardando' ? 'aguardando contato' : 'contatado'}
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {leads.map(lead => (
+                      <div key={lead.lead_id || lead.user_id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-700 rounded-lg gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-white">{lead.name}</p>
+                            {lead.plan_type && (
+                              <Badge className={lead.plan_type === 'lojista' ? 'bg-[#F9C02D] text-[#1A4D2E]' : 'bg-blue-600'}>
+                                {lead.plan_type === 'lojista' ? 'Lojista - R$149' : 'Anúncio Único - R$49'}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-slate-400">{lead.email}</p>
+                          <div className="flex items-center gap-4 mt-2 flex-wrap">
+                            {lead.phone && (
+                              <a 
+                                href={`https://wa.me/55${lead.phone.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-green-400 hover:text-green-300 flex items-center gap-1"
+                              >
+                                <Phone className="w-4 h-4" />
+                                {lead.phone}
+                              </a>
+                            )}
+                            <span className="text-xs text-slate-500">
+                              Cadastro: {new Date(lead.created_at).toLocaleDateString('pt-BR')}
+                            </span>
+                            {lead.contacted_at && (
+                              <span className="text-xs text-green-500">
+                                Contatado: {new Date(lead.contacted_at).toLocaleDateString('pt-BR')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-0 sm:ml-4">
+                          {lead.status === 'aguardando' ? (
+                            <>
+                              <Button 
+                                size="sm"
+                                onClick={() => handleMarkLeadContacted(lead.user_id, true)}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                <Check className="w-4 h-4 mr-1" />
+                                Marcar Contatado
+                              </Button>
+                              <Button 
+                                size="sm"
+                                onClick={() => handleApproveUser(lead.user_id)}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                <Check className="w-4 h-4 mr-1" />
+                                Aprovar Usuário
+                              </Button>
+                            </>
+                          ) : (
+                            <Button 
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleMarkLeadContacted(lead.user_id, false)}
+                              className="text-amber-400 border-amber-700 hover:bg-amber-900/50"
+                            >
+                              Voltar p/ Aguardando
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -3923,6 +4632,93 @@ const AdminPage = () => {
                 </div>
               )}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create User Modal */}
+        <Dialog open={showCreateUserModal} onOpenChange={setShowCreateUserModal}>
+          <DialogContent className="bg-slate-800 border-slate-700">
+            <DialogHeader>
+              <DialogTitle className="text-white">Criar Novo Usuário</DialogTitle>
+              <DialogDescription className="text-slate-400">
+                O usuário será criado já aprovado e ativo
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreateUser} className="space-y-4 mt-4">
+              <div>
+                <Label className="text-slate-300">Nome *</Label>
+                <Input
+                  value={createUserData.name}
+                  onChange={(e) => setCreateUserData({...createUserData, name: e.target.value})}
+                  placeholder="Nome completo ou nome da loja"
+                  className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300">Email *</Label>
+                <Input
+                  type="email"
+                  value={createUserData.email}
+                  onChange={(e) => setCreateUserData({...createUserData, email: e.target.value})}
+                  placeholder="email@exemplo.com"
+                  className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300">WhatsApp *</Label>
+                <Input
+                  value={createUserData.phone}
+                  onChange={(e) => setCreateUserData({...createUserData, phone: e.target.value})}
+                  placeholder="(67) 99999-9999"
+                  className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300">Tipo de Conta *</Label>
+                <select
+                  value={createUserData.account_type}
+                  onChange={(e) => setCreateUserData({...createUserData, account_type: e.target.value})}
+                  className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
+                >
+                  <option value="anuncio_unico">Anúncio Único - R$49 (1 anúncio / 3 meses)</option>
+                  <option value="lojista">Lojista - R$149 (20 anúncios / 3 meses)</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-slate-300">Senha (opcional)</Label>
+                <Input
+                  type="text"
+                  value={createUserData.password}
+                  onChange={(e) => setCreateUserData({...createUserData, password: e.target.value})}
+                  placeholder="Deixe vazio para gerar automaticamente"
+                  className="mt-1 bg-slate-700 border-slate-600 text-white"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  A senha será exibida após criar o usuário
+                </p>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowCreateUserModal(false)}
+                  className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={creatingUser}
+                  className="flex-1 bg-[#1A4D2E] hover:bg-[#143d24]"
+                >
+                  {creatingUser ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                  Criar Usuário
+                </Button>
+              </div>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
@@ -4547,6 +5343,7 @@ const AppRouter = () => {
           <Route path="/anunciar" element={<ListingFormPage />} />
           <Route path="/editar/:id" element={<ListingFormPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/perfil/editar" element={<EditProfilePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/lojas" element={<StoresListPage />} />
           <Route path="/loja/:slug" element={<StorePage />} />
