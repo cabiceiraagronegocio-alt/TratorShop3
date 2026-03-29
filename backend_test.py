@@ -2,6 +2,7 @@ import requests
 import sys
 from datetime import datetime
 import json
+import time
 
 class TratorShopAPITester:
     def __init__(self, base_url="https://tratorshop-preview.preview.emergentagent.com"):
@@ -10,6 +11,8 @@ class TratorShopAPITester:
         self.tests_run = 0
         self.tests_passed = 0
         self.failed_tests = []
+        self.admin_session = None
+        self.user_session = None
 
     def run_test(self, name, method, endpoint, expected_status, data=None, headers=None, session=None):
         """Run a single API test"""
@@ -193,6 +196,104 @@ class TratorShopAPITester:
         
         return all([success1, success2, success3, success4, success5, success6, success7, success8, success9, success10, success11])
 
+    def test_new_features(self):
+        """Test new features from bug fixes and improvements"""
+        print("\n🆕 Testing New Features and Bug Fixes...")
+        
+        # Test 1: Plans with trimestral text
+        success1, plans_data = self.run_test("Plans API", "GET", "plans", 200)
+        trimestral_check = False
+        if success1 and plans_data and 'plans' in plans_data:
+            for plan_key, plan_info in plans_data['plans'].items():
+                if plan_info.get('validity_days') == 90:  # 3 months = trimestral
+                    trimestral_check = True
+                    print(f"   ✅ Found trimestral plan: {plan_key} with 90 days validity")
+                    break
+        
+        # Test 2: Public seller profile endpoint
+        success2, _ = self.run_test("Public Seller Profile (404 expected)", "GET", "vendedor/nonexistent_user", 404)
+        
+        # Test 3: Condition filter in listings
+        success3, listings_data = self.run_test("Listings with Condition Filter", "GET", "listings?condition=novo", 200)
+        if success3 and listings_data:
+            print(f"   ✅ Condition filter working, returned {listings_data.get('total', 0)} listings")
+        
+        # Test 4: Image deletion endpoint (should require auth)
+        success4, _ = self.run_test("Image Deletion Endpoint (401 expected)", "DELETE", "listings/test/images/0", 401)
+        
+        # Test 5: Profile photo upload endpoint (should require auth or file)
+        success5, _ = self.run_test("Profile Photo Upload (422 expected - missing file)", "POST", "user/profile/photo", 422)
+        
+        return all([success1, trimestral_check, success2, success3, success4, success5])
+
+    def test_admin_features_with_auth(self):
+        """Test admin features that require authentication"""
+        print("\n👑 Testing Admin Features with Authentication...")
+        
+        # First login as admin
+        admin_session = requests.Session()
+        login_success, _ = self.run_test(
+            "Admin Login for Features Test", 
+            "POST", 
+            "admin/auth/login", 
+            200,
+            data={"email": "admin@tratorshop.com", "password": "Admin@123"},
+            session=admin_session
+        )
+        
+        if not login_success:
+            print("❌ Cannot test admin features - login failed")
+            return False
+        
+        # Test admin stats (for pending badge)
+        success1, stats_data = self.run_test("Admin Stats", "GET", "admin/stats", 200, session=admin_session)
+        pending_users_check = False
+        if success1 and stats_data and 'users' in stats_data:
+            pending_count = stats_data['users'].get('pending_approval', 0)
+            pending_users_check = True
+            print(f"   ✅ Found {pending_count} pending users for badge")
+        
+        # Test admin listings (for photos visibility)
+        success2, admin_listings = self.run_test("Admin Listings", "GET", "admin/listings", 200, session=admin_session)
+        photos_check = False
+        if success2 and admin_listings:
+            # Check if listings have images field
+            for listing in admin_listings[:3]:  # Check first 3 listings
+                if 'images' in listing:
+                    photos_check = True
+                    print(f"   ✅ Listing {listing.get('listing_id', 'unknown')} has {len(listing['images'])} images")
+                    break
+        
+        # Test dealer limit setting
+        success3, users_data = self.run_test("Get Users for Limit Test", "GET", "admin/users", 200, session=admin_session)
+        dealer_limit_check = False
+        if success3 and users_data:
+            # Find a dealer user
+            dealer_user = None
+            for user in users_data[:10]:  # Check first 10 users
+                if user.get('role') == 'dealer':
+                    dealer_user = user
+                    break
+            
+            if dealer_user:
+                user_id = dealer_user['user_id']
+                success4, _ = self.run_test(
+                    "Set Dealer Limit to 20", 
+                    "PUT", 
+                    f"admin/users/{user_id}/limit", 
+                    200,
+                    data={"max_listings": 20},
+                    session=admin_session
+                )
+                dealer_limit_check = success4
+                if success4:
+                    print(f"   ✅ Successfully set dealer limit to 20 for user {user_id}")
+            else:
+                print("   ⚠️ No dealer users found to test limit setting")
+                dealer_limit_check = True  # Don't fail test if no dealers exist
+        
+        return all([success1, pending_users_check, success2, photos_check, success3, dealer_limit_check])
+
 def main():
     print("🚀 Starting TratorShop Admin Panel API Tests")
     print("=" * 60)
@@ -205,11 +306,17 @@ def main():
     # Test public endpoints first
     test_results.append(("Public Endpoints", tester.test_public_endpoints()))
     
+    # Test new features and bug fixes
+    test_results.append(("New Features & Bug Fixes", tester.test_new_features()))
+    
     # Test admin login
     test_results.append(("Admin Login", tester.test_admin_login()))
     
     # Test admin functionality
     test_results.append(("Admin Endpoints", tester.test_admin_endpoints()))
+    
+    # Test admin features with authentication
+    test_results.append(("Admin Features with Auth", tester.test_admin_features_with_auth()))
     
     # Print summary
     print("\n" + "=" * 60)

@@ -1090,6 +1090,7 @@ const SearchPage = () => {
   const category = searchParams.get('category') || '';
   const city = searchParams.get('city') || '';
   const search = searchParams.get('search') || '';
+  const condition = searchParams.get('condition') || '';
   const featured = searchParams.get('featured') === 'true';
 
   const seo = getSearchSEO(category, city, search);
@@ -1102,6 +1103,7 @@ const SearchPage = () => {
         if (category) params.set('category', category);
         if (city) params.set('city', city);
         if (search) params.set('search', search);
+        if (condition) params.set('condition', condition);
         if (featured) params.set('featured', 'true');
         params.set('page', page.toString());
         params.set('limit', '20');
@@ -1117,7 +1119,7 @@ const SearchPage = () => {
       }
     };
     fetchListings();
-  }, [category, city, search, featured, page]);
+  }, [category, city, search, condition, featured, page]);
 
   const handleSearch = ({ query, city: newCity }) => {
     const params = new URLSearchParams(searchParams);
@@ -1182,6 +1184,34 @@ const SearchPage = () => {
               </Button>
             ))}
           </div>
+        </div>
+
+        {/* Condition Filter */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          <span className="text-sm text-slate-600 flex items-center mr-2">Estado:</span>
+          {[
+            { value: '', label: 'Todos' },
+            { value: 'novo', label: 'Novo' },
+            { value: 'semi-novo', label: 'Semi-novo' },
+            { value: 'usado', label: 'Usado' }
+          ].map(cond => (
+            <Button
+              key={cond.value}
+              variant={condition === cond.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                const params = new URLSearchParams(searchParams);
+                if (cond.value) params.set('condition', cond.value);
+                else params.delete('condition');
+                setSearchParams(params);
+                setPage(1);
+              }}
+              className={condition === cond.value ? "bg-[#F9C02D] text-[#1A4D2E] hover:bg-[#e5ad28]" : ""}
+              data-testid={`filter-condition-${cond.value || 'all'}`}
+            >
+              {cond.label}
+            </Button>
+          ))}
         </div>
 
         {/* Listings Grid */}
@@ -1587,6 +1617,9 @@ const ListingFormPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Prevent double submit
+    if (loading) return;
+    
     if (!formData.title || !formData.description || !formData.category || !formData.price || !formData.city || !formData.whatsapp || !formData.condition) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
@@ -1604,20 +1637,21 @@ const ListingFormPage = () => {
       if (isEditing) {
         await axios.put(`${API}/listings/${editId}`, payload, { withCredentials: true });
         toast.success("Anúncio atualizado! Aguardando re-aprovação.");
+        navigate('/dashboard');
       } else {
         const res = await axios.post(`${API}/listings`, payload, { withCredentials: true });
-        setListingId(res.data.listing_id);
-        toast.success("Anúncio criado! Agora adicione fotos.");
-      }
-      
-      if (!isEditing && !listingId) {
-        // Stay on page to add images after creation
-      } else {
-        navigate('/dashboard');
+        // Check if it was a duplicate (backend returns duplicate: true)
+        if (res.data.duplicate) {
+          toast.warning("Este anúncio já foi criado. Redirecionando...");
+          setListingId(res.data.listing_id);
+        } else {
+          setListingId(res.data.listing_id);
+          toast.success("Anúncio criado! Agora adicione fotos.");
+        }
       }
     } catch (error) {
       console.error("Error saving listing:", error);
-      toast.error("Erro ao salvar anúncio");
+      toast.error(error.response?.data?.detail || "Erro ao salvar anúncio");
     } finally {
       setLoading(false);
     }
@@ -2044,12 +2078,12 @@ const OnboardingPage = () => {
                   </p>
                   <p className="flex items-center gap-2 text-slate-700">
                     <Check className="w-4 h-4 text-green-500" />
-                    Validade: 3 meses
+                    Validade: 3 meses (trimestral)
                   </p>
                 </div>
                 <div className="pt-4 border-t">
                   <p className="text-3xl font-bold text-blue-600">R$ 49</p>
-                  <p className="text-sm text-slate-500">pagamento único</p>
+                  <p className="text-sm text-slate-500">pagamento trimestral</p>
                 </div>
               </button>
 
@@ -2088,13 +2122,13 @@ const OnboardingPage = () => {
                   </p>
                   <p className="flex items-center gap-2 text-slate-700">
                     <Check className="w-4 h-4 text-green-500" />
-                    Validade: 3 meses
+                    Validade: 3 meses (trimestral)
                   </p>
                 </div>
                 <div className="pt-4 border-t">
                   <p className="text-3xl font-bold text-[#1A4D2E]">R$ 149</p>
                   <p className="text-sm text-slate-500">
-                    <span className="line-through">R$ 149</span> 1ª parcela: <span className="text-green-600 font-bold">R$ 97</span>
+                    trimestral | 1ª parcela: <span className="text-green-600 font-bold">R$ 97</span>
                   </p>
                 </div>
               </button>
@@ -3452,6 +3486,21 @@ const AdminPage = () => {
             </div>
             
             <div className="flex items-center gap-4">
+              {/* Pending Users Badge */}
+              {stats?.users?.pending_approval > 0 && (
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setActiveTab('users')}
+                    className="text-amber-400 hover:text-amber-300 hover:bg-slate-700 relative"
+                  >
+                    <User className="w-5 h-5" />
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
+                      {stats.users.pending_approval}
+                    </span>
+                  </Button>
+                </div>
+              )}
               <Link to="/" className="text-slate-400 hover:text-white text-sm">
                 Ver Site
               </Link>
@@ -3705,6 +3754,38 @@ const AdminPage = () => {
                                   Criado: {new Date(listing.created_at).toLocaleDateString('pt-BR')}
                                   {listing.expires_at && ` • Expira: ${new Date(listing.expires_at).toLocaleDateString('pt-BR')}`}
                                 </p>
+                                {/* Show all images for pending listings */}
+                                {listing.images?.length > 0 && (
+                                  <div className="mt-3">
+                                    <p className="text-sm text-slate-400 mb-2">Fotos ({listing.images.length}):</p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {listing.images.map((img, idx) => (
+                                        <div key={idx} className="relative group">
+                                          <img 
+                                            src={`${API}/files/${img}`}
+                                            alt={`Foto ${idx + 1}`}
+                                            className="w-16 h-16 object-cover rounded border border-slate-600"
+                                          />
+                                          <button
+                                            onClick={async () => {
+                                              if (!window.confirm(`Excluir esta foto?`)) return;
+                                              try {
+                                                await axios.delete(`${API}/listings/${listing.listing_id}/images/${idx}`, { withCredentials: true });
+                                                toast.success("Foto excluída");
+                                                fetchListings();
+                                              } catch (error) {
+                                                toast.error("Erro ao excluir foto");
+                                              }
+                                            }}
+                                            className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                               <div className="flex flex-wrap gap-2 justify-end">
                                 {/* Edit button - always visible */}
@@ -5304,6 +5385,163 @@ const StorePage = () => {
   );
 };
 
+// Seller Public Profile Page (SEO-friendly)
+const SellerProfilePage = () => {
+  const { userId } = useParams();
+  const [seller, setSeller] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const fetchSeller = async () => {
+      setLoading(true);
+      try {
+        const res = await axios.get(`${API}/vendedor/${userId}`);
+        setSeller(res.data);
+      } catch (error) {
+        console.error("Error fetching seller:", error);
+        setSeller(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSeller();
+  }, [userId]);
+
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 0
+    }).format(price);
+  };
+
+  const handleShareProfile = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      toast.success("Link copiado!");
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleWhatsAppClick = () => {
+    if (!seller?.phone) return;
+    const phone = seller.phone.replace(/\D/g, '');
+    const message = encodeURIComponent(`Olá! Vi seu perfil no TratorShop.`);
+    window.open(`https://wa.me/55${phone}?text=${message}`, '_blank');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-12 h-12 animate-spin text-[#1A4D2E]" />
+      </div>
+    );
+  }
+
+  if (!seller) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <User className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Vendedor não encontrado</h1>
+          <p className="text-slate-500 mb-6">Este perfil não existe ou não está disponível.</p>
+          <Link to="/">
+            <Button className="bg-[#1A4D2E] hover:bg-[#143d24]">
+              Voltar ao início
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50" data-testid="seller-profile-page">
+      <SEOHead 
+        title={`${seller.name} - Vendedor | TratorShop`}
+        description={seller.bio || `Veja os anúncios de ${seller.name} no TratorShop`}
+      />
+      
+      {/* Profile Header */}
+      <div className="bg-gradient-to-b from-[#1A4D2E] to-[#143d24] py-12">
+        <div className="max-w-4xl mx-auto px-4 md:px-8">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+            <Avatar className="w-24 h-24 border-4 border-white shadow-lg">
+              {seller.picture ? (
+                <AvatarImage src={seller.picture.startsWith('http') ? seller.picture : `${API}/files/${seller.picture}`} />
+              ) : null}
+              <AvatarFallback className="bg-[#F9C02D] text-[#1A4D2E] text-3xl">
+                {seller.name?.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 text-center md:text-left">
+              <h1 className="text-2xl md:text-3xl font-bold text-white mb-2" style={{ fontFamily: 'Outfit' }}>
+                {seller.name}
+              </h1>
+              {seller.role === 'dealer' && (
+                <Badge className="bg-[#F9C02D] text-[#1A4D2E] mb-3">
+                  <Store className="w-3 h-3 mr-1" />
+                  Lojista
+                </Badge>
+              )}
+              {seller.bio && (
+                <p className="text-white/80 mb-4">{seller.bio}</p>
+              )}
+              {seller.address && (
+                <p className="text-white/60 text-sm flex items-center justify-center md:justify-start gap-1">
+                  <MapPin className="w-4 h-4" />
+                  {seller.address}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-3">
+              {seller.phone && (
+                <Button 
+                  onClick={handleWhatsAppClick}
+                  className="bg-green-500 hover:bg-green-600"
+                >
+                  <Phone className="w-4 h-4 mr-2" />
+                  WhatsApp
+                </Button>
+              )}
+              <Button 
+                variant="outline"
+                onClick={handleShareProfile}
+                className="border-white text-white hover:bg-white/10"
+              >
+                {copied ? <Check className="w-4 h-4 mr-2" /> : <Share2 className="w-4 h-4 mr-2" />}
+                {copied ? 'Copiado!' : 'Compartilhar'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Listings */}
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
+        <h2 className="text-xl font-semibold text-slate-900 mb-6" style={{ fontFamily: 'Outfit' }}>
+          Anúncios ({seller.total_listings})
+        </h2>
+        
+        {seller.listings?.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {seller.listings.map(listing => (
+              <ListingCard key={listing.listing_id} listing={listing} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-500">Este vendedor ainda não tem anúncios ativos.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // App Router
 const AppRouter = () => {
   const location = useLocation();
@@ -5347,6 +5585,7 @@ const AppRouter = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/lojas" element={<StoresListPage />} />
           <Route path="/loja/:slug" element={<StorePage />} />
+          <Route path="/vendedor/:userId" element={<SellerProfilePage />} />
         </Routes>
       </main>
       <Footer />

@@ -720,29 +720,20 @@ async def upload_profile_photo(request: Request, file: UploadFile = File(...)):
     
     # Generate unique filename
     ext = file.filename.split(".")[-1] if file.filename else "jpg"
-    filename = f"profile_{user['user_id']}_{uuid.uuid4().hex[:8]}.{ext}"
+    path = f"{APP_NAME}/profiles/{user['user_id']}_{uuid.uuid4().hex[:8]}.{ext}"
     
-    # Upload to storage
+    # Upload to storage using put_object (same as listings)
     try:
-        files = {"file": (filename, content, file.content_type)}
-        data = {"path": f"profiles/{filename}"}
-        resp = requests.post(
-            f"{STORAGE_URL}/upload",
-            files=files,
-            data=data,
-            timeout=60
-        )
-        resp.raise_for_status()
-        result = resp.json()
-        photo_url = result.get("url")
+        result = put_object(path, content, file.content_type)
+        photo_path = result.get("path")
         
         # Update user picture
         await db.users.update_one(
             {"user_id": user["user_id"]},
-            {"$set": {"picture": photo_url}}
+            {"$set": {"picture": photo_path}}
         )
         
-        return {"url": photo_url}
+        return {"path": photo_path, "url": f"/api/files/{photo_path}"}
     except Exception as e:
         logger.error(f"Profile photo upload failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload photo")
@@ -1044,7 +1035,7 @@ async def complete_onboarding(data: UserOnboarding, request: Request):
             "whatsapp": "",
             "city": "",
             "description": "",
-            "max_listings": 10,  # Dealers start with 10 listings
+            "max_listings": 20,  # Dealers start with 20 listings (Plano Lojista)
             "is_active": True,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
@@ -1108,6 +1099,50 @@ async def get_dealer_listings(
         "page": page,
         "pages": (total + limit - 1) // limit
     }
+
+@api_router.get("/vendedor/{user_id}")
+async def get_seller_public_profile(user_id: str):
+    """Get seller public profile by user_id (for SEO-friendly public page)"""
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Vendedor não encontrado")
+    
+    # Only show active users
+    if user.get("status") != "active":
+        raise HTTPException(status_code=404, detail="Vendedor não encontrado")
+    
+    # Count active listings
+    active_listings = await db.listings.find(
+        {"user_id": user_id, "status": "approved"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    
+    # Prepare public profile data
+    profile = {
+        "user_id": user["user_id"],
+        "name": user.get("store_name") or user.get("name"),
+        "picture": user.get("picture"),
+        "bio": user.get("bio"),
+        "address": user.get("address"),
+        "phone": user.get("phone"),
+        "role": user.get("role", "user"),
+        "plan_type": user.get("plan_type"),
+        "created_at": user.get("created_at"),
+        "listings": active_listings,
+        "total_listings": len(active_listings)
+    }
+    
+    # Add dealer-specific info if dealer
+    if user.get("role") == "dealer" and user.get("dealer_profile"):
+        profile["dealer_profile"] = {
+            "store_name": user["dealer_profile"].get("store_name"),
+            "store_slug": user["dealer_profile"].get("store_slug"),
+            "store_logo": user["dealer_profile"].get("store_logo"),
+            "city": user["dealer_profile"].get("city"),
+            "description": user["dealer_profile"].get("description")
+        }
+    
+    return profile
 
 @api_router.get("/dealer/profile")
 async def get_dealer_profile(request: Request):
@@ -1471,6 +1506,7 @@ async def get_listings(
     category: Optional[str] = None,
     city: Optional[str] = None,
     search: Optional[str] = None,
+    condition: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     featured: Optional[bool] = None,
@@ -1484,6 +1520,8 @@ async def get_listings(
         query["category"] = category.lower()
     if city:
         query["city"] = {"$regex": city, "$options": "i"}
+    if condition:
+        query["condition"] = condition
     if search:
         query["$or"] = [
             {"title": {"$regex": search, "$options": "i"}},
@@ -1554,6 +1592,17 @@ async def create_listing(listing: ListingCreate, request: Request):
             status_code=403, 
             detail="Seu cadastro ainda está em análise. Aguarde a aprovação do administrador para criar anúncios."
         )
+    
+    # Idempotency check - prevent duplicate listings within 30 seconds
+    thirty_seconds_ago = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+    duplicate = await db.listings.find_one({
+        "user_id": user["user_id"],
+        "title": listing.title,
+        "created_at": {"$gte": thirty_seconds_ago}
+    })
+    if duplicate:
+        # Return existing listing instead of creating duplicate
+        return {"listing_id": duplicate["listing_id"], "message": "Anúncio já criado", "duplicate": True}
     
     # Check listing limit based on user type
     current_count = await db.listings.count_documents({
@@ -1682,6 +1731,45 @@ async def upload_listing_image(listing_id: str, file: UploadFile = File(...), re
     )
     
     return {"path": result["path"], "message": "Image uploaded"}
+
+@api_router.delete("/listings/{listing_id}/images/{image_index}")
+async def delete_listing_image(listing_id: str, image_index: int, request: Request):
+    """Delete specific image from listing (owner or admin)"""
+    user = await get_current_user(request)
+    admin = await get_current_admin(request)
+    
+    if not user and not admin:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    listing = await db.listings.find_one({"listing_id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    # Check permissions
+    if user and listing["user_id"] != user["user_id"] and not user.get("is_admin"):
+        if not admin:
+            raise HTTPException(status_code=403, detail="Not authorized")
+    
+    images = listing.get("images", [])
+    if image_index < 0 or image_index >= len(images):
+        raise HTTPException(status_code=400, detail="Invalid image index")
+    
+    # Remove image from list
+    image_path = images[image_index]
+    images.pop(image_index)
+    
+    await db.listings.update_one(
+        {"listing_id": listing_id},
+        {"$set": {"images": images}}
+    )
+    
+    # Optionally delete from storage (commented for safety)
+    # try:
+    #     delete_object(image_path)
+    # except:
+    #     pass
+    
+    return {"message": "Image deleted", "remaining_images": len(images)}
 
 @api_router.get("/files/{path:path}")
 async def get_file(path: str):
