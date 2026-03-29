@@ -2440,7 +2440,7 @@ const AdminLoginPage = () => {
 
 // Admin Change Password Page
 const AdminChangePasswordPage = () => {
-  const { admin, adminLogout } = useAdminAuth();
+  const { admin, adminLogout, checkAdminAuth } = useAdminAuth();
   const navigate = useNavigate();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -2474,6 +2474,8 @@ const AdminChangePasswordPage = () => {
         { withCredentials: true }
       );
       toast.success("Senha alterada com sucesso!");
+      // Update admin state to reflect password change
+      await checkAdminAuth();
       navigate('/admin');
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erro ao alterar senha");
