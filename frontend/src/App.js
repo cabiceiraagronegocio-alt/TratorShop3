@@ -290,7 +290,7 @@ const Header = () => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full" data-testid="user-menu-trigger">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src={user.picture} alt={user.name} />
+                      <AvatarImage src={user.picture ? (user.picture.startsWith('http') ? user.picture : `${API}/files/${user.picture}`) : null} alt={user.name} />
                       <AvatarFallback className="bg-[#1A4D2E] text-white">
                         {user.name?.charAt(0)}
                       </AvatarFallback>
@@ -1514,18 +1514,21 @@ const ListingDetailPage = () => {
                 {/* Seller Info */}
                 {listing.seller && (
                   <div className="mt-6 pt-6 border-t border-slate-100">
-                    <div className="flex items-center gap-3">
+                    <Link 
+                      to={`/vendedor/${listing.seller.user_id || listing.user_id}`}
+                      className="flex items-center gap-3 hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
+                    >
                       <Avatar>
-                        <AvatarImage src={listing.seller.picture} />
+                        <AvatarImage src={listing.seller.picture?.startsWith('http') ? listing.seller.picture : listing.seller.picture ? `${API}/files/${listing.seller.picture}` : null} />
                         <AvatarFallback className="bg-[#1A4D2E] text-white">
                           {listing.seller.name?.charAt(0)}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
+                      <div className="flex-1">
                         <p className="font-semibold">{listing.seller.name}</p>
-                        <p className="text-sm text-slate-500">Vendedor</p>
+                        <p className="text-sm text-slate-500">Ver perfil do vendedor →</p>
                       </div>
-                    </div>
+                    </Link>
                   </div>
                 )}
 
@@ -2598,7 +2601,7 @@ const DashboardPage = () => {
 
 // Edit Profile Page
 const EditProfilePage = () => {
-  const { user, setUser } = useAuth();
+  const { user, setUser, checkAuth } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -2665,9 +2668,12 @@ const EditProfilePage = () => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
+      // Update user in context with new picture
       setUser(prev => ({ ...prev, picture: res.data.path }));
       toast.success("Foto atualizada!");
-      // Reload profile to get updated picture
+      // Reload auth to update everywhere
+      await checkAuth();
+      // Reload profile
       fetchProfile();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erro ao enviar foto");
@@ -2692,7 +2698,7 @@ const EditProfilePage = () => {
             <div className="flex items-center gap-4 mb-6">
               <div className="relative">
                 <Avatar className="w-20 h-20">
-                  <AvatarImage src={user?.picture} />
+                  <AvatarImage src={user?.picture ? (user.picture.startsWith('http') ? user.picture : `${API}/files/${user.picture}`) : null} />
                   <AvatarFallback className="bg-[#1A4D2E] text-white text-2xl">
                     {user?.name?.charAt(0)}
                   </AvatarFallback>
@@ -4063,7 +4069,7 @@ const AdminPage = () => {
                       <div key={user.user_id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-700 rounded-lg gap-3">
                         <div className="flex items-center gap-3">
                           <Avatar>
-                            <AvatarImage src={user.picture} />
+                            <AvatarImage src={user.picture ? (user.picture.startsWith('http') ? user.picture : `${API}/files/${user.picture}`) : null} />
                             <AvatarFallback className="bg-amber-600 text-white">
                               {user.name?.charAt(0)}
                             </AvatarFallback>
@@ -4132,7 +4138,7 @@ const AdminPage = () => {
                     <div key={user.user_id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-700 rounded-lg gap-3">
                       <div className="flex items-center gap-3">
                         <Avatar>
-                          <AvatarImage src={user.picture} />
+                          <AvatarImage src={user.picture ? (user.picture.startsWith('http') ? user.picture : `${API}/files/${user.picture}`) : null} />
                           <AvatarFallback className="bg-[#1A4D2E] text-white">
                             {user.name?.charAt(0)}
                           </AvatarFallback>
