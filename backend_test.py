@@ -4,12 +4,14 @@ from datetime import datetime
 import json
 
 class TratorShopAPITester:
-    def __init__(self, base_url="http://localhost:8001"):
+    def __init__(self, base_url="https://trator-ms.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.tests_run = 0
         self.tests_passed = 0
         self.failed_tests = []
+        self.user_session = None
+        self.user_token = None
 
     def run_test(self, name, method, endpoint, expected_status, data=None, headers=None, session=None):
         """Run a single API test"""
@@ -93,6 +95,133 @@ class TratorShopAPITester:
         
         return None
 
+    def get_user_session(self):
+        """Get authenticated user session"""
+        session = requests.Session()
+        login_response = session.post(
+            f"{self.api_url}/auth/login",
+            json={"email": "novousuario@teste.com", "password": "teste123456"}
+        )
+        
+        if login_response.status_code == 200:
+            # Extract the session token
+            session_token = None
+            for cookie in login_response.cookies:
+                if cookie.name == 'session_token':
+                    session_token = cookie.value
+                    break
+            
+            if session_token:
+                # Create a new session with the token as a header
+                auth_session = requests.Session()
+                auth_session.headers.update({'Cookie': f'session_token={session_token}'})
+                self.user_session = auth_session
+                self.user_token = session_token
+                return auth_session
+        
+        return None
+
+    def test_user_login(self):
+        """Test user login with test credentials"""
+        print("\n=== TESTING USER LOGIN ===")
+        success, response = self.run_test(
+            "User Login",
+            "POST",
+            "auth/login",
+            200,
+            data={"email": "novousuario@teste.com", "password": "teste123456"}
+        )
+        if success:
+            print("✅ User login successful")
+            return True
+        return False
+
+    def test_user_endpoints(self):
+        """Test user-specific endpoints"""
+        print("\n=== TESTING USER ENDPOINTS ===")
+        
+        # Get authenticated user session
+        user_session = self.get_user_session()
+        if not user_session:
+            print("❌ Failed to get user session")
+            return False
+        
+        # Test user profile
+        success1, profile_data = self.run_test("Get User Profile", "GET", "user/profile", 200, session=user_session)
+        if success1 and profile_data:
+            print(f"   User: {profile_data.get('name', 'Unknown')}")
+            print(f"   Status: {profile_data.get('status', 'Unknown')}")
+            user_id = profile_data.get('user_id')
+        
+        # Test profile update with website field
+        success2, _ = self.run_test(
+            "Update Profile with Website", 
+            "PUT", 
+            "user/profile", 
+            200, 
+            data={"website": "https://example.com", "bio": "Test bio", "address": "Test address"},
+            session=user_session
+        )
+        
+        # Test public profile endpoint
+        success3 = True
+        if success1 and profile_data and profile_data.get('user_id'):
+            user_id = profile_data['user_id']
+            success3, public_data = self.run_test(
+                "Get Public Profile", 
+                "GET", 
+                f"user/public/{user_id}", 
+                200
+            )
+            if success3 and public_data:
+                print(f"   Public profile has website: {public_data.get('website', 'None')}")
+        
+        return all([success1, success2, success3])
+
+    def test_new_admin_features(self):
+        """Test new admin features for image management"""
+        print("\n=== TESTING NEW ADMIN FEATURES ===")
+        
+        # Get authenticated admin session
+        admin_session = self.get_admin_session()
+        if not admin_session:
+            print("❌ Failed to get admin session")
+            return False
+        
+        # Test admin stats (should show pending users)
+        success1, stats_data = self.run_test("Admin Stats with Pending Users", "GET", "admin/stats", 200, session=admin_session)
+        if success1 and stats_data:
+            pending_users = stats_data.get('users', {}).get('pending_approval', 0)
+            print(f"   Pending users: {pending_users}")
+        
+        # Test admin listings with expired filter
+        success2, expired_data = self.run_test("Admin Expired Listings", "GET", "admin/listings?status=expired", 200, session=admin_session)
+        if success2 and expired_data:
+            print(f"   Found {len(expired_data)} expired listings")
+        
+        # Test listing image deletion (if listings with images exist)
+        success3 = True
+        listings_response = admin_session.get(f"{self.api_url}/admin/listings")
+        if listings_response.status_code == 200:
+            listings = listings_response.json()
+            listing_with_images = None
+            for listing in listings:
+                if listing.get('images') and len(listing['images']) > 0:
+                    listing_with_images = listing
+                    break
+            
+            if listing_with_images:
+                listing_id = listing_with_images['listing_id']
+                image_index = 0
+                success3, _ = self.run_test(
+                    "Delete Listing Image", 
+                    "DELETE", 
+                    f"admin/listings/{listing_id}/images/{image_index}", 
+                    200, 
+                    session=admin_session
+                )
+        
+        return all([success1, success2, success3])
     def test_public_endpoints(self):
         """Test public endpoints that don't require auth"""
         print("\n=== TESTING PUBLIC ENDPOINTS ===")
@@ -194,7 +323,7 @@ class TratorShopAPITester:
         return all([success1, success2, success3, success4, success5, success6, success7, success8, success9, success10, success11])
 
 def main():
-    print("🚀 Starting TratorShop Admin Panel API Tests")
+    print("🚀 Starting TratorShop API Tests - New Features")
     print("=" * 60)
     
     tester = TratorShopAPITester()
@@ -205,11 +334,18 @@ def main():
     # Test public endpoints first
     test_results.append(("Public Endpoints", tester.test_public_endpoints()))
     
+    # Test user login and features
+    test_results.append(("User Login", tester.test_user_login()))
+    test_results.append(("User Endpoints", tester.test_user_endpoints()))
+    
     # Test admin login
     test_results.append(("Admin Login", tester.test_admin_login()))
     
     # Test admin functionality
     test_results.append(("Admin Endpoints", tester.test_admin_endpoints()))
+    
+    # Test new admin features
+    test_results.append(("New Admin Features", tester.test_new_admin_features()))
     
     # Print summary
     print("\n" + "=" * 60)
