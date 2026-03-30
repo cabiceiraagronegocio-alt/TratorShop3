@@ -2204,12 +2204,15 @@ const OnboardingPage = () => {
                 <p className="text-sm text-slate-500 mt-1">
                   Ideal para quem quer vender algumas máquinas.
                 </p>
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex flex-wrap items-center gap-2 mt-2">
                   <Badge variant="secondary" className="bg-slate-100 text-slate-600">
                     1 anúncio
                   </Badge>
                   <Badge variant="secondary" className="bg-blue-100 text-blue-700">
                     R$ 49,00
+                  </Badge>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700">
+                    Válido por 3 meses
                   </Badge>
                 </div>
               </div>
@@ -2244,6 +2247,9 @@ const OnboardingPage = () => {
                   </Badge>
                   <Badge className="bg-[#1A4D2E]/10 text-[#1A4D2E]">
                     R$ 149,00
+                  </Badge>
+                  <Badge className="bg-green-100 text-green-700">
+                    Válido por 3 meses
                   </Badge>
                 </div>
               </div>
