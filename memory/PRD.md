@@ -4,67 +4,99 @@
 
 ---
 
-## RESUMO PARA PRÓXIMO AGENTE
+## RESUMO EXECUTIVO
 
-### O que é o TratorShop?
-Marketplace de máquinas agrícolas focado no Mato Grosso do Sul (MS), Brasil.
+Marketplace de máquinas agrícolas focado no **Mato Grosso do Sul (MS)**, Brasil.
 
 ### Stack
-- **Frontend:** React 19 + TailwindCSS + Shadcn/UI + React Router v7
+- **Frontend:** React 19 + TailwindCSS + Shadcn/UI
 - **Backend:** FastAPI + MongoDB (Motor async)
 - **Auth:** Emergent Auth (Google OAuth + Email/Senha)
-- **Storage:** Emergent Object Storage (upload de imagens)
+- **Storage:** Emergent Object Storage
 
 ---
 
-## FUNCIONALIDADES COMPLETAS
+## PLANOS (TRIMESTRAIS - 3 meses)
+
+| Plano | Anúncios | Preço | Observação |
+|-------|----------|-------|------------|
+| **Anúncio Único** | 1 | R$ 49,00 | - |
+| **Lojista** | 20 | R$ 149,00 | 1ª parcela R$ 97,00 |
+
+---
+
+## FLUXO DE APROVAÇÃO
+
+1. Usuário se cadastra
+2. Status inicial: `pending_approval`
+3. Mensagem: "Cadastro em Análise - Entraremos em contato via WhatsApp"
+4. Admin libera usuário manualmente
+5. Status muda para `active`
+
+---
+
+## FUNCIONALIDADES IMPLEMENTADAS
 
 ### Interface
 - ✅ Logo TratorShop (header e footer)
-- ✅ Menu responsivo (Tratores, Implementos, Colheitadeiras, Peças)
-- ✅ Hero com imagem de fundo e busca
-- ✅ Categorias com imagens
+- ✅ Menu responsivo
 - ✅ Footer com Instagram, email, cidades
-- ✅ Área Administrativa (link no footer)
+- ✅ Hero com busca
+- ✅ Categorias com imagens
+- ✅ Filtro por condição (Novo/Semi-novo/Usado)
 
 ### Autenticação
-- ✅ Login com Email/Senha
-- ✅ Login com Google OAuth
-- ✅ Sistema de onboarding (individual vs dealer)
-- ✅ Logout
+- ✅ Login Email/Senha
+- ✅ Login Google OAuth
+- ✅ Sistema de onboarding
+- ✅ Status pending_approval
+- ✅ Mensagem WhatsApp aguardando liberação
+
+### Perfil do Usuário
+- ✅ Upload de foto de perfil
+- ✅ Edição de nome, telefone, bio
+- ✅ Edição de endereço
+- ✅ Edição de website/redes sociais
+- ✅ Perfil público do vendedor (/vendedor/{id})
+- ✅ Botão compartilhar mini site
 
 ### Anúncios
-- ✅ Criar anúncio com imagens
-- ✅ Upload de múltiplas imagens
-- ✅ Categorias (tratores, implementos, colheitadeiras, peças)
+- ✅ Criar anúncio com múltiplas imagens
+- ✅ Proteção contra duplicação
+- ✅ Limite por plano (1 ou 20)
+- ✅ Status: pending, approved, rejected, expired
 - ✅ Preços formatados em R$
-- ✅ Busca por cidade
-- ✅ Detalhes do anúncio
 - ✅ WhatsApp para contato
 
 ### Painel Admin Completo
-- ✅ Login admin separado
 - ✅ Dashboard com estatísticas
-- ✅ Gerenciar anúncios (aprovar, rejeitar, editar, excluir)
-- ✅ Tab "Expirados" para anúncios vencidos
-- ✅ Expirar anúncio manualmente
-- ✅ Destacar anúncio (featured)
-- ✅ Gerenciar usuários (listar, editar, excluir)
-- ✅ Alterar limite de anúncios por usuário
-- ✅ Promover para Dealer
-- ✅ Tornar/Remover Admin
-- ✅ Ver anúncios de um usuário específico
-- ✅ Gerenciar dealers
+- ✅ Notificação de usuários pendentes
+- ✅ **Gestão de Anúncios:**
+  - Aprovar/Rejeitar
+  - Editar todos os campos
+  - Alterar status
+  - Destacar (featured)
+  - Expirar manualmente
+  - Tab "Expirados"
+  - **Visualizar fotos do anúncio**
+  - **Excluir fotos individuais**
+- ✅ **Gestão de Usuários:**
+  - Listar todos
+  - Ver anúncios do usuário
+  - Alterar limite de anúncios
+  - Promover para Dealer
+  - Tornar/Remover Admin
+  - Excluir usuário
 
 ---
 
-## CREDENCIAIS DE ACESSO
+## CREDENCIAIS DE TESTE
 
-| Tipo | Email | Senha | Rota |
-|------|-------|-------|------|
-| **Admin** | admin@tratorshop.com | Admin@123 | /admin-login |
-| **Usuário** | novousuario@teste.com | teste123456 | /login |
-| **Lojista** | lojista@teste.com | teste123456 | /login |
+| Tipo | Email | Senha |
+|------|-------|-------|
+| **Admin** | admin@tratorshop.com | Admin@123 |
+| **Usuário** | novousuario@teste.com | teste123456 |
+| **Lojista** | lojista@teste.com | teste123456 |
 
 ---
 
@@ -76,8 +108,17 @@ POST /api/auth/register
 POST /api/auth/login
 POST /api/auth/logout
 GET  /api/auth/me
-POST /api/auth/callback (Google OAuth)
+POST /api/auth/callback
 POST /api/onboarding
+```
+
+### Perfil do Usuário
+```
+GET  /api/user/profile
+PUT  /api/user/profile
+POST /api/user/profile-picture    # Upload foto
+GET  /api/user/public/{user_id}   # Perfil público
+GET  /api/vendedor/{user_id}      # Página vendedor
 ```
 
 ### Anúncios
@@ -104,11 +145,10 @@ POST /api/admin/listings/{id}/approve
 POST /api/admin/listings/{id}/reject
 POST /api/admin/listings/{id}/feature
 POST /api/admin/listings/{id}/expire
+DELETE /api/admin/listings/{id}/images/{index}  # Excluir foto
 POST /api/admin/make-admin/{user_id}
 POST /api/admin/remove-admin/{user_id}
 GET  /api/admin/users/{user_id}/listings
-GET  /api/admin/dealers
-POST /api/admin/dealers/promote
 ```
 
 ---
@@ -119,11 +159,13 @@ POST /api/admin/dealers/promote
 |------|-----------|
 | `/` | Home |
 | `/login` | Login |
-| `/onboarding` | Escolha de tipo de conta |
+| `/onboarding` | Escolha de plano |
 | `/dashboard` | Painel do usuário |
 | `/meus-anuncios` | Meus anúncios |
 | `/anunciar` | Criar anúncio |
 | `/anuncio/{id}` | Detalhes |
+| `/perfil/editar` | Editar perfil |
+| `/vendedor/{id}` | Perfil público |
 | `/categoria/{cat}` | Por categoria |
 | `/loja/{slug}` | Página da loja |
 | `/admin-login` | Login admin |
@@ -131,72 +173,24 @@ POST /api/admin/dealers/promote
 
 ---
 
-## ARQUIVOS IMPORTANTES
+## MELHORIAS IMPLEMENTADAS (30/03/2026)
 
-```
-/app/
-├── backend/
-│   ├── server.py           # API (~2234 linhas)
-│   ├── requirements.txt
-│   └── .env
-├── frontend/
-│   ├── public/
-│   │   ├── logo-light.png  # Logo fundo claro
-│   │   ├── logo-dark.png   # Logo fundo escuro
-│   │   └── favicon.ico
-│   ├── src/
-│   │   ├── App.js          # React App (~5632 linhas)
-│   │   └── components/ui/
-│   ├── package.json
-│   └── .env
-└── memory/
-    └── PRD.md
-```
-
----
-
-## CONFIGURAÇÃO
-
-### Backend (.env)
-```
-MONGO_URL="mongodb://localhost:27017"
-DB_NAME="test_database"
-CORS_ORIGINS="*"
-EMERGENT_LLM_KEY="sk-emergent-XXXXX"
-```
-
-### Frontend (.env)
-```
-REACT_APP_BACKEND_URL=https://[URL].preview.emergentagent.com
-WDS_SOCKET_PORT=443
-```
-
----
-
-## COMANDOS
-
-```bash
-# Reiniciar serviços
-sudo supervisorctl restart backend frontend
-
-# Logs
-tail -f /var/log/supervisor/backend.err.log
-tail -f /var/log/supervisor/frontend.err.log
-
-# API
-curl http://localhost:8001/api/
-
-# MongoDB
-mongosh --eval 'db = db.getSiblingDB("test_database"); db.users.find({})'
-```
+1. ✅ Plano lojista = 20 anúncios (já estava correto)
+2. ✅ Upload foto de perfil funcionando
+3. ✅ Campo website no perfil
+4. ✅ Perfil público com foto, nome, bio, endereço, website
+5. ✅ Admin visualiza fotos ao editar anúncio
+6. ✅ Admin pode excluir fotos individuais
+7. ✅ Dashboard mostra usuários pendentes
+8. ✅ Filtro Novo/Semi-novo/Usado já existia
 
 ---
 
 ## PROBLEMA CONHECIDO
 
-### URL Preview não funciona
-- A URL preview serve site Framer da Emergent
-- **Solução:** App funciona em localhost ou fazer deploy em produção
+### URL Preview
+- URL preview pode servir site Framer em vez do app
+- **Solução:** Funciona em localhost ou deploy em produção
 
 ---
 
@@ -210,6 +204,24 @@ mongosh --eval 'db = db.getSiblingDB("test_database"); db.users.find({})'
 
 ---
 
+## COMANDOS ÚTEIS
+
+```bash
+# Reiniciar serviços
+sudo supervisorctl restart backend frontend
+
+# Logs
+tail -f /var/log/supervisor/backend.err.log
+
+# API
+curl http://localhost:8001/api/
+
+# MongoDB
+mongosh --eval 'db = db.getSiblingDB("test_database"); db.users.find({})'
+```
+
+---
+
 ## REPOSITÓRIO
 
 - **GitHub:** https://github.com/cabiceiraagronegocio-alt/TratorShop3
@@ -217,4 +229,4 @@ mongosh --eval 'db = db.getSiblingDB("test_database"); db.users.find({})'
 
 ---
 
-*Atualizado em 30/03/2026*
+*Atualizado em 30/03/2026 - Todas as melhorias solicitadas implementadas*
