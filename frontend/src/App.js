@@ -8,7 +8,7 @@ import {
   Plus, LogOut, User, Settings, Tractor, Wrench, Cog, Loader2,
   ChevronLeft, MessageCircle, Share2, Heart, Filter, Grid, List,
   Upload, Image as ImageIcon, Trash2, Edit, Camera, Shield, Lock, Mail,
-  Store, Users, Building2, Package, Check, Instagram
+  Store, Users, Building2, Package, Check, Instagram, Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -2601,6 +2601,7 @@ const EditProfilePage = () => {
     phone: '',
     bio: '',
     address: '',
+    website: '',
     store_name: ''
   });
   const fileInputRef = useRef(null);
@@ -2621,6 +2622,7 @@ const EditProfilePage = () => {
         phone: res.data.phone || '',
         bio: res.data.bio || '',
         address: res.data.address || '',
+        website: res.data.website || '',
         store_name: res.data.store_name || ''
       });
     } catch (error) {
@@ -2652,15 +2654,17 @@ const EditProfilePage = () => {
       const formData = new FormData();
       formData.append('file', file);
       
-      const res = await axios.post(`${API}/user/profile/photo`, formData, {
+      const res = await axios.post(`${API}/user/profile-picture`, formData, {
         withCredentials: true,
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
-      setUser(prev => ({ ...prev, picture: res.data.url }));
+      setUser(prev => ({ ...prev, picture: res.data.path }));
       toast.success("Foto atualizada!");
+      // Reload profile to get updated picture
+      fetchProfile();
     } catch (error) {
-      toast.error("Erro ao enviar foto");
+      toast.error(error.response?.data?.detail || "Erro ao enviar foto");
     } finally {
       setUploading(false);
     }
@@ -2764,6 +2768,16 @@ const EditProfilePage = () => {
                   onChange={(e) => setProfile({...profile, address: e.target.value})}
                   placeholder="Rua, número, bairro, cidade - UF"
                   rows={2}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label>Website / Redes Sociais</Label>
+                <Input
+                  value={profile.website}
+                  onChange={(e) => setProfile({...profile, website: e.target.value})}
+                  placeholder="https://www.seusite.com.br"
                   className="mt-1"
                 />
               </div>
@@ -4627,6 +4641,43 @@ const AdminPage = () => {
                     Anúncio em Destaque
                   </Label>
                 </div>
+
+                {/* Images Section */}
+                {editingListing?.images?.length > 0 && (
+                  <div className="md:col-span-2 mt-4">
+                    <Label className="text-slate-300 mb-2 block">Imagens do Anúncio</Label>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {editingListing.images.map((img, idx) => (
+                        <div key={idx} className="relative group">
+                          <img
+                            src={`${API}/files/${img}`}
+                            alt={`Imagem ${idx + 1}`}
+                            className="w-full h-20 object-cover rounded-lg"
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!window.confirm('Excluir esta imagem?')) return;
+                              try {
+                                await axios.delete(`${API}/admin/listings/${editingListing.listing_id}/images/${idx}`, { withCredentials: true });
+                                toast.success("Imagem excluída!");
+                                // Update the local state
+                                const newImages = [...editingListing.images];
+                                newImages.splice(idx, 1);
+                                setEditingListing({...editingListing, images: newImages});
+                              } catch (error) {
+                                toast.error("Erro ao excluir imagem");
+                              }
+                            }}
+                            className="absolute top-1 right-1 p-1 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="w-3 h-3 text-white" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex gap-3 pt-4">
                 <Button 
@@ -5517,6 +5568,17 @@ const SellerProfilePage = () => {
                   <MapPin className="w-4 h-4" />
                   {seller.address}
                 </p>
+              )}
+              {seller.website && (
+                <a 
+                  href={seller.website.startsWith('http') ? seller.website : `https://${seller.website}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#F9C02D] text-sm flex items-center justify-center md:justify-start gap-1 hover:underline mt-1"
+                >
+                  <Globe className="w-4 h-4" />
+                  {seller.website.replace(/^https?:\/\//, '')}
+                </a>
               )}
             </div>
             <div className="flex gap-3">

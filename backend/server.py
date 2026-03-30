@@ -100,6 +100,7 @@ class UserBase(BaseModel):
     phone: Optional[str] = None
     bio: Optional[str] = None
     address: Optional[str] = None
+    website: Optional[str] = None
     store_name: Optional[str] = None
     # Plan fields
     plan_type: Optional[str] = None  # "anuncio_unico" or "lojista"
@@ -609,6 +610,112 @@ async def login_user(data: UserLogin):
 # =============================================================================
 # USER PROFILE & PLAN ROUTES
 # =============================================================================
+
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    bio: Optional[str] = None
+    address: Optional[str] = None
+    website: Optional[str] = None
+
+@api_router.put("/user/profile")
+async def update_profile(profile: ProfileUpdate, request: Request):
+    """Update user profile"""
+    user = await require_user(request)
+    
+    update_data = {}
+    if profile.name:
+        update_data["name"] = profile.name
+    if profile.phone is not None:
+        update_data["phone"] = profile.phone
+    if profile.bio is not None:
+        update_data["bio"] = profile.bio
+    if profile.address is not None:
+        update_data["address"] = profile.address
+    if profile.website is not None:
+        update_data["website"] = profile.website
+    
+    if update_data:
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": update_data}
+        )
+    
+    updated_user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "password_hash": 0})
+    return updated_user
+
+@api_router.post("/user/profile-picture")
+async def upload_profile_picture(file: UploadFile = File(...), request: Request = None):
+    """Upload user profile picture"""
+    user = await require_user(request)
+    
+    if not storage_key:
+        raise HTTPException(status_code=500, detail="Storage não configurado")
+    
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Tipo de arquivo não suportado")
+    
+    # Generate unique filename
+    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    filename = f"{uuid.uuid4()}.{ext}"
+    path = f"tratorshop/profiles/{user['user_id']}/{filename}"
+    
+    # Read and upload file
+    content = await file.read()
+    
+    try:
+        result = put_object(path, content, file.content_type)
+        
+        # Update user profile picture
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"picture": result["path"]}}
+        )
+        
+        return {"path": result["path"], "message": "Foto de perfil atualizada"}
+    except Exception as e:
+        logger.error(f"Profile picture upload error: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao fazer upload da imagem")
+
+@api_router.get("/user/public/{user_id}")
+async def get_public_profile(user_id: str):
+    """Get public profile of a user/seller"""
+    user = await db.users.find_one(
+        {"user_id": user_id},
+        {"_id": 0, "password_hash": 0, "email": 0}
+    )
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Get user's approved listings count
+    listings_count = await db.listings.count_documents({
+        "user_id": user_id,
+        "status": "approved"
+    })
+    
+    # Get user's listings
+    listings = await db.listings.find(
+        {"user_id": user_id, "status": "approved"},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(20).to_list(20)
+    
+    return {
+        "user_id": user["user_id"],
+        "name": user.get("name", ""),
+        "picture": user.get("picture"),
+        "bio": user.get("bio", ""),
+        "address": user.get("address", ""),
+        "website": user.get("website", ""),
+        "phone": user.get("phone", ""),
+        "role": user.get("role", "user"),
+        "dealer_profile": user.get("dealer_profile") if user.get("role") == "dealer" else None,
+        "listings_count": listings_count,
+        "listings": listings,
+        "created_at": user.get("created_at")
+    }
 
 # Plan configurations
 PLANS = {
@@ -1124,6 +1231,7 @@ async def get_seller_public_profile(user_id: str):
         "picture": user.get("picture"),
         "bio": user.get("bio"),
         "address": user.get("address"),
+        "website": user.get("website"),
         "phone": user.get("phone"),
         "role": user.get("role", "user"),
         "plan_type": user.get("plan_type"),
@@ -1954,6 +2062,30 @@ async def get_user_listings(user_id: str, request: Request):
         "listings": listings,
         "total": len(listings)
     }
+
+@api_router.delete("/admin/listings/{listing_id}/images/{image_index}")
+async def admin_delete_listing_image(listing_id: str, image_index: int, request: Request):
+    """Delete a specific image from a listing (admin only)"""
+    await require_admin(request)
+    
+    listing = await db.listings.find_one({"listing_id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Anúncio não encontrado")
+    
+    images = listing.get("images", [])
+    if image_index < 0 or image_index >= len(images):
+        raise HTTPException(status_code=400, detail="Índice de imagem inválido")
+    
+    # Remove image from list
+    image_to_delete = images[image_index]
+    images.pop(image_index)
+    
+    await db.listings.update_one(
+        {"listing_id": listing_id},
+        {"$set": {"images": images}}
+    )
+    
+    return {"message": "Imagem excluída", "deleted_image": image_to_delete, "remaining_images": images}
 
 # =============================================================================
 # ADMIN - LEADS MANAGEMENT
