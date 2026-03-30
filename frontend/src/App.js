@@ -8,7 +8,7 @@ import {
   Plus, LogOut, User, Settings, Tractor, Wrench, Cog, Loader2,
   ChevronLeft, MessageCircle, Share2, Heart, Filter, Grid, List,
   Upload, Image as ImageIcon, Trash2, Edit, Camera, Shield, Lock, Mail,
-  Store, Users, Building2, Package, Check
+  Store, Users, Building2, Package, Check, Instagram
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -252,12 +252,12 @@ const Header = () => {
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2" data-testid="logo-link">
-            <div className="w-10 h-10 bg-[#1A4D2E] rounded-lg flex items-center justify-center">
-              <Tractor className="w-6 h-6 text-white" />
-            </div>
-            <span className="font-bold text-xl text-[#1A4D2E] hidden sm:block" style={{ fontFamily: 'Outfit' }}>
-              TratorShop
-            </span>
+            {/* Logo responsiva - usa imagem */}
+            <img 
+              src="/logo-light.png" 
+              alt="TratorShop" 
+              className="h-10 md:h-12 w-auto object-contain"
+            />
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
@@ -312,6 +312,10 @@ const Header = () => {
                   <DropdownMenuItem onClick={() => navigate('/dashboard')} data-testid="menu-dashboard">
                     <User className="w-4 h-4 mr-2" />
                     Meus Anúncios
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/perfil/editar')} data-testid="menu-edit-profile">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Editar Perfil
                   </DropdownMenuItem>
                   {user.role === 'dealer' && user.dealer_profile?.store_slug && (
                     <DropdownMenuItem onClick={() => navigate(`/loja/${user.dealer_profile.store_slug}`)} data-testid="menu-my-store">
@@ -400,10 +404,12 @@ const Footer = () => (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
-              <Tractor className="w-6 h-6 text-[#F9C02D]" />
-            </div>
-            <span className="font-bold text-xl" style={{ fontFamily: 'Outfit' }}>TratorShop</span>
+            {/* Logo para dark mode (fundo verde) */}
+            <img 
+              src="/logo-dark.png" 
+              alt="TratorShop" 
+              className="h-10 w-auto object-contain"
+            />
           </div>
           <p className="text-white/70 text-sm">
             O maior marketplace de máquinas agrícolas do Mato Grosso do Sul.
@@ -437,6 +443,20 @@ const Footer = () => (
             Dúvidas ou sugestões?<br />
             contato@tratorshop.com.br
           </p>
+          
+          {/* Redes Sociais */}
+          <div className="mt-4 flex items-center gap-3">
+            <a 
+              href="https://www.instagram.com/tratorshop?igsh=MXNzcjQ3cnFlaGdnaQ==" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors"
+              data-testid="footer-instagram"
+            >
+              <Instagram className="w-5 h-5 text-white" />
+            </a>
+          </div>
+          
           <div className="mt-4 pt-4 border-t border-white/10">
             <Link to="/admin-login" className="text-white/50 hover:text-white text-xs flex items-center gap-1" data-testid="footer-admin-link">
               <Shield className="w-3 h-3" />
@@ -670,7 +690,7 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
   };
 
   const handleFileSelect = async (e) => {
-    const files = Array.from(e.target.files);
+    const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
     if (images.length + files.length > maxImages) {
@@ -685,17 +705,22 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
 
     for (let i = 0; i < files.length; i++) {
       let file = files[i];
-      const fileName = file.name.toLowerCase();
+      const fileName = (file.name || 'image.jpg').toLowerCase();
       
-      // Check for HEIC format
-      const isHeic = fileName.endsWith('.heic') || fileName.endsWith('.heif') || file.type === 'image/heic' || file.type === 'image/heif';
+      // Check for HEIC format - also check for empty type (common on iOS)
+      const isHeic = fileName.endsWith('.heic') || fileName.endsWith('.heif') || 
+                     file.type === 'image/heic' || file.type === 'image/heif' ||
+                     (file.type === '' && (fileName.endsWith('.heic') || fileName.endsWith('.heif')));
       
-      // Validate file type (including HEIC)
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+      // Validate file type (including HEIC) - be more lenient for mobile
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', ''];
       const validExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'];
       const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
       
-      if (!validTypes.includes(file.type) && !hasValidExtension && !isHeic) {
+      // If type is empty but it's an image from camera, treat as valid
+      const isLikelyImage = file.type.startsWith('image/') || file.type === '' || hasValidExtension;
+      
+      if (!isLikelyImage && !hasValidExtension && !isHeic) {
         toast.error(`${file.name}: Formato não suportado. Use JPG, PNG, WEBP ou HEIC`);
         continue;
       }
@@ -707,13 +732,19 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
           file = await convertHeicToJpeg(file);
         }
         
-        // Compress image if larger than 1MB
-        if (file.size > 1024 * 1024) {
-          file = await compressImage(file);
+        // Always compress images for mobile - reduces upload time
+        // Compress all images larger than 500KB or if they don't have proper dimensions
+        if (file.size > 500 * 1024) {
+          try {
+            file = await compressImage(file);
+          } catch (compressErr) {
+            console.warn("Compression failed, using original:", compressErr);
+            // Continue with original file if compression fails
+          }
         }
 
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', file, file.name || 'image.jpg');
         
         const res = await axios.post(
           `${API}/listings/${listingId}/images`,
@@ -721,9 +752,12 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
           { 
             withCredentials: true,
             headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 60000, // 60 second timeout for mobile
             onUploadProgress: (progressEvent) => {
-              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-              setUploadProgress(Math.round(((i + percentCompleted / 100) / files.length) * 100));
+              if (progressEvent.total) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                setUploadProgress(Math.round(((i + percentCompleted / 100) / files.length) * 100));
+              }
             }
           }
         );
@@ -731,13 +765,16 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
         setUploadProgress(Math.round(((i + 1) / files.length) * 100));
       } catch (error) {
         console.error("Error uploading image:", error);
-        toast.error(`Erro ao enviar ${file.name}`);
+        const errorMsg = error.response?.data?.detail || error.message || 'Erro desconhecido';
+        toast.error(`Erro ao enviar ${file.name}: ${errorMsg}`);
       }
     }
 
     if (newImages.length > 0) {
       onImagesChange([...images, ...newImages]);
       toast.success(`${newImages.length} imagem(ns) enviada(s)`);
+    } else if (files.length > 0) {
+      toast.error("Nenhuma imagem foi enviada. Verifique sua conexão.");
     }
     setUploading(false);
     setUploadProgress(0);
@@ -809,9 +846,8 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
+              accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif"
               multiple
-              capture="environment"
               onChange={handleFileSelect}
               className="hidden"
               disabled={uploading}
@@ -1070,6 +1106,7 @@ const SearchPage = () => {
   const category = searchParams.get('category') || '';
   const city = searchParams.get('city') || '';
   const search = searchParams.get('search') || '';
+  const condition = searchParams.get('condition') || '';
   const featured = searchParams.get('featured') === 'true';
 
   const seo = getSearchSEO(category, city, search);
@@ -1082,6 +1119,7 @@ const SearchPage = () => {
         if (category) params.set('category', category);
         if (city) params.set('city', city);
         if (search) params.set('search', search);
+        if (condition) params.set('condition', condition);
         if (featured) params.set('featured', 'true');
         params.set('page', page.toString());
         params.set('limit', '20');
@@ -1097,7 +1135,7 @@ const SearchPage = () => {
       }
     };
     fetchListings();
-  }, [category, city, search, featured, page]);
+  }, [category, city, search, condition, featured, page]);
 
   const handleSearch = ({ query, city: newCity }) => {
     const params = new URLSearchParams(searchParams);
@@ -1162,6 +1200,34 @@ const SearchPage = () => {
               </Button>
             ))}
           </div>
+        </div>
+
+        {/* Condition Filter */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          <span className="text-sm text-slate-600 flex items-center mr-2">Estado:</span>
+          {[
+            { value: '', label: 'Todos' },
+            { value: 'novo', label: 'Novo' },
+            { value: 'semi-novo', label: 'Semi-novo' },
+            { value: 'usado', label: 'Usado' }
+          ].map(cond => (
+            <Button
+              key={cond.value}
+              variant={condition === cond.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                const params = new URLSearchParams(searchParams);
+                if (cond.value) params.set('condition', cond.value);
+                else params.delete('condition');
+                setSearchParams(params);
+                setPage(1);
+              }}
+              className={condition === cond.value ? "bg-[#F9C02D] text-[#1A4D2E] hover:bg-[#e5ad28]" : ""}
+              data-testid={`filter-condition-${cond.value || 'all'}`}
+            >
+              {cond.label}
+            </Button>
+          ))}
         </div>
 
         {/* Listings Grid */}
@@ -1567,6 +1633,9 @@ const ListingFormPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Prevent double submit
+    if (loading) return;
+    
     if (!formData.title || !formData.description || !formData.category || !formData.price || !formData.city || !formData.whatsapp || !formData.condition) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
@@ -1584,20 +1653,21 @@ const ListingFormPage = () => {
       if (isEditing) {
         await axios.put(`${API}/listings/${editId}`, payload, { withCredentials: true });
         toast.success("Anúncio atualizado! Aguardando re-aprovação.");
+        navigate('/dashboard');
       } else {
         const res = await axios.post(`${API}/listings`, payload, { withCredentials: true });
-        setListingId(res.data.listing_id);
-        toast.success("Anúncio criado! Agora adicione fotos.");
-      }
-      
-      if (!isEditing && !listingId) {
-        // Stay on page to add images after creation
-      } else {
-        navigate('/dashboard');
+        // Check if it was a duplicate (backend returns duplicate: true)
+        if (res.data.duplicate) {
+          toast.warning("Este anúncio já foi criado. Redirecionando...");
+          setListingId(res.data.listing_id);
+        } else {
+          setListingId(res.data.listing_id);
+          toast.success("Anúncio criado! Agora adicione fotos.");
+        }
       }
     } catch (error) {
       console.error("Error saving listing:", error);
-      toast.error("Erro ao salvar anúncio");
+      toast.error(error.response?.data?.detail || "Erro ao salvar anúncio");
     } finally {
       setLoading(false);
     }
@@ -1841,8 +1911,10 @@ const OnboardingPage = () => {
   const navigate = useNavigate();
   const [accountType, setAccountType] = useState('');
   const [storeName, setStoreName] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(true);
+  const [step, setStep] = useState(1); // 1: type selection, 2: plan selection, 3: confirmation
 
   useEffect(() => {
     // Check if user needs onboarding
@@ -1859,6 +1931,8 @@ const OnboardingPage = () => {
           navigate('/dashboard');
           return;
         }
+        // Pre-fill phone if available
+        if (res.data.phone) setPhone(res.data.phone);
       } catch (error) {
         console.error("Error checking profile:", error);
         navigate('/login');
@@ -1870,32 +1944,32 @@ const OnboardingPage = () => {
     checkOnboarding();
   }, [user, navigate]);
 
-  const handleSubmit = async () => {
-    if (!accountType) {
-      toast.error("Selecione um tipo de conta");
-      return;
-    }
-    
-    if (accountType === 'dealer' && !storeName.trim()) {
-      toast.error("Nome da loja é obrigatório");
-      return;
-    }
-
+  const handleSelectPlan = async (planType) => {
     setLoading(true);
     try {
+      // First save phone if provided
+      if (phone) {
+        await axios.put(`${API}/user/profile`, { phone }, { withCredentials: true });
+      }
+
+      // Select the plan
+      await axios.post(`${API}/user/select-plan`, { plan_type: planType }, { withCredentials: true });
+      
+      // Complete onboarding
       const res = await axios.post(
         `${API}/user/onboarding`,
         { 
-          account_type: accountType,
-          store_name: accountType === 'dealer' ? storeName : null
+          account_type: planType === 'lojista' ? 'dealer' : 'individual',
+          store_name: planType === 'lojista' ? storeName : null
         },
         { withCredentials: true }
       );
       setUser(res.data);
-      toast.success("Perfil configurado com sucesso!");
-      navigate('/dashboard');
+      
+      // Go to confirmation step
+      setStep(3);
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Erro ao configurar perfil");
+      toast.error(error.response?.data?.detail || "Erro ao configurar plano");
     } finally {
       setLoading(false);
     }
@@ -1909,6 +1983,188 @@ const OnboardingPage = () => {
     );
   }
 
+  // Step 3: Confirmation (Pending Approval)
+  if (step === 3) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#1A4D2E] to-[#0d2617] flex items-center justify-center py-12 px-4">
+        <SEOHead title="Cadastro Realizado" />
+        
+        <Card className="w-full max-w-lg shadow-2xl">
+          <CardHeader className="text-center pb-2">
+            <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-12 h-12 text-amber-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900" style={{ fontFamily: 'Outfit' }}>
+              Aguardando Validação
+            </h1>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <p className="text-slate-600">
+              Seu cadastro foi realizado com sucesso!
+            </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-amber-800 font-medium">
+                Nossa equipe entrará em contato via WhatsApp para finalizar seu cadastro.
+              </p>
+            </div>
+            <p className="text-sm text-slate-500">
+              Enquanto isso, você pode explorar o site e completar seu perfil.
+            </p>
+            <div className="pt-4 space-y-3">
+              <Button
+                onClick={() => navigate('/perfil/editar')}
+                className="w-full bg-[#1A4D2E] hover:bg-[#143d24]"
+              >
+                Completar Perfil
+              </Button>
+              <Button
+                onClick={() => navigate('/dashboard')}
+                variant="outline"
+                className="w-full"
+              >
+                Ir para Dashboard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Step 2: Plan Selection
+  if (step === 2) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#1A4D2E] to-[#0d2617] flex items-center justify-center py-12 px-4">
+        <SEOHead title="Escolha seu Plano" />
+        
+        <Card className="w-full max-w-2xl shadow-2xl">
+          <CardHeader className="text-center pb-2">
+            <h1 className="text-2xl font-bold text-[#1A4D2E]" style={{ fontFamily: 'Outfit' }}>
+              Escolha seu Plano
+            </h1>
+            <p className="text-slate-500">
+              Selecione o plano ideal para você
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Phone Input */}
+            <div className="mb-6">
+              <Label className="text-base font-medium">Seu WhatsApp (para contato)</Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="(67) 99999-9999"
+                className="mt-2 py-5 text-lg"
+              />
+            </div>
+
+            {/* Store Name for Lojista */}
+            {accountType === 'dealer' && (
+              <div className="mb-6">
+                <Label className="text-base font-medium">Nome da sua Loja</Label>
+                <Input
+                  value={storeName}
+                  onChange={(e) => setStoreName(e.target.value)}
+                  placeholder="Ex: Tratores do Sul"
+                  className="mt-2 py-5 text-lg"
+                />
+              </div>
+            )}
+
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Plano Anúncio Único */}
+              <button
+                onClick={() => handleSelectPlan('anuncio_unico')}
+                disabled={loading}
+                className="p-6 rounded-xl border-2 border-blue-200 bg-blue-50 hover:border-blue-400 hover:shadow-lg transition-all text-left"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                    <User className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-slate-900">Anúncio Único</h3>
+                    <p className="text-sm text-slate-500">Para vendas pontuais</p>
+                  </div>
+                </div>
+                <div className="space-y-2 mb-4">
+                  <p className="flex items-center gap-2 text-slate-700">
+                    <Check className="w-4 h-4 text-green-500" />
+                    1 anúncio ativo
+                  </p>
+                  <p className="flex items-center gap-2 text-slate-700">
+                    <Check className="w-4 h-4 text-green-500" />
+                    Validade: 3 meses (trimestral)
+                  </p>
+                </div>
+                <div className="pt-4 border-t">
+                  <p className="text-3xl font-bold text-blue-600">R$ 49</p>
+                  <p className="text-sm text-slate-500">pagamento trimestral</p>
+                </div>
+              </button>
+
+              {/* Plano Lojista */}
+              <button
+                onClick={() => {
+                  if (accountType !== 'dealer' || !storeName.trim()) {
+                    toast.error("Preencha o nome da loja primeiro");
+                    return;
+                  }
+                  handleSelectPlan('lojista');
+                }}
+                disabled={loading || (accountType === 'dealer' && !storeName.trim())}
+                className="p-6 rounded-xl border-2 border-[#F9C02D] bg-[#F9C02D]/10 hover:shadow-lg transition-all text-left relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 bg-[#F9C02D] text-[#1A4D2E] px-3 py-1 text-xs font-bold rounded-bl-lg">
+                  POPULAR
+                </div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-[#F9C02D] rounded-xl flex items-center justify-center">
+                    <Store className="w-6 h-6 text-[#1A4D2E]" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-slate-900">Lojista</h3>
+                    <p className="text-sm text-slate-500">Para revendedores</p>
+                  </div>
+                </div>
+                <div className="space-y-2 mb-4">
+                  <p className="flex items-center gap-2 text-slate-700">
+                    <Check className="w-4 h-4 text-green-500" />
+                    Até 20 anúncios ativos
+                  </p>
+                  <p className="flex items-center gap-2 text-slate-700">
+                    <Check className="w-4 h-4 text-green-500" />
+                    Página exclusiva da loja
+                  </p>
+                  <p className="flex items-center gap-2 text-slate-700">
+                    <Check className="w-4 h-4 text-green-500" />
+                    Validade: 3 meses (trimestral)
+                  </p>
+                </div>
+                <div className="pt-4 border-t">
+                  <p className="text-3xl font-bold text-[#1A4D2E]">R$ 149</p>
+                  <p className="text-sm text-slate-500">
+                    trimestral | 1ª parcela: <span className="text-green-600 font-bold">R$ 97</span>
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <Button
+              variant="ghost"
+              onClick={() => setStep(1)}
+              className="w-full mt-4"
+            >
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              Voltar
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Step 1: Account Type Selection
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1A4D2E] to-[#0d2617] flex items-center justify-center py-12 px-4" data-testid="onboarding-page">
       <SEOHead title="Complete seu Cadastro" />
@@ -1950,10 +2206,10 @@ const OnboardingPage = () => {
                 </p>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant="secondary" className="bg-slate-100 text-slate-600">
-                    Até 3 anúncios
+                    1 anúncio
                   </Badge>
-                  <Badge variant="secondary" className="bg-green-100 text-green-700">
-                    Grátis
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                    R$ 49,00
                   </Badge>
                 </div>
               </div>
@@ -1984,10 +2240,10 @@ const OnboardingPage = () => {
                 </p>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <Badge className="bg-[#F9C02D]/20 text-[#1A4D2E]">
-                    Até 10 anúncios
+                    Até 20 anúncios
                   </Badge>
                   <Badge className="bg-[#1A4D2E]/10 text-[#1A4D2E]">
-                    Página exclusiva da loja
+                    R$ 149,00
                   </Badge>
                 </div>
               </div>
@@ -2013,17 +2269,13 @@ const OnboardingPage = () => {
           )}
 
           <Button
-            onClick={handleSubmit}
-            disabled={loading || !accountType}
+            onClick={() => setStep(2)}
+            disabled={!accountType || (accountType === 'dealer' && !storeName.trim())}
             className="w-full bg-[#1A4D2E] hover:bg-[#143d24] py-7 text-lg font-bold mt-6"
             data-testid="onboarding-submit"
           >
-            {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin mr-2" />
-            ) : (
-              <ChevronRight className="w-5 h-5 mr-2" />
-            )}
-            Continuar
+            <ChevronRight className="w-5 h-5 mr-2" />
+            Escolher Plano
           </Button>
           
           <p className="text-center text-xs text-slate-400 pt-2">
@@ -2134,6 +2386,28 @@ const DashboardPage = () => {
       <SEOHead title="Meus Anúncios" />
       
       <div className="max-w-6xl mx-auto px-4 md:px-8">
+        {/* Pending Approval Warning */}
+        {userProfile?.status === 'pending_approval' && (
+          <Card className="mb-6 bg-amber-50 border-amber-200">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-6 h-6 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-amber-800">Cadastro em Análise</h3>
+                  <p className="text-amber-700 mt-1">
+                    Seu cadastro está em análise. Entraremos em contato via WhatsApp para finalizar sua liberação.
+                  </p>
+                  <p className="text-amber-600 text-sm mt-2">
+                    Enquanto isso, você pode completar seu perfil e explorar o site.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Dealer Info Card */}
         {userProfile?.role === 'dealer' && dealerInfo && (
           <Card className="mb-6 bg-gradient-to-r from-[#1A4D2E] to-[#2d6e45] text-white">
@@ -2199,10 +2473,16 @@ const DashboardPage = () => {
             </p>
           </div>
           <Button 
-            onClick={() => navigate('/anunciar')}
+            onClick={() => {
+              if (userProfile?.status === 'pending_approval') {
+                toast.error("Seu cadastro está em análise. Aguarde a aprovação para criar anúncios.");
+                return;
+              }
+              navigate('/anunciar');
+            }}
             className="bg-[#F9C02D] hover:bg-[#f5b00b] text-[#1A4D2E] font-bold"
             data-testid="new-listing-button"
-            disabled={activeListings >= maxListings}
+            disabled={activeListings >= maxListings || userProfile?.status === 'pending_approval'}
           >
             <Plus className="w-4 h-4 mr-2" />
             Novo Anúncio
@@ -2310,6 +2590,210 @@ const DashboardPage = () => {
   );
 };
 
+// Edit Profile Page
+const EditProfilePage = () => {
+  const { user, setUser } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [profile, setProfile] = useState({
+    name: '',
+    phone: '',
+    bio: '',
+    address: '',
+    store_name: ''
+  });
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    fetchProfile();
+  }, [user, navigate]);
+
+  const fetchProfile = async () => {
+    try {
+      const res = await axios.get(`${API}/user/profile`, { withCredentials: true });
+      setProfile({
+        name: res.data.name || '',
+        phone: res.data.phone || '',
+        bio: res.data.bio || '',
+        address: res.data.address || '',
+        store_name: res.data.store_name || ''
+      });
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await axios.put(`${API}/user/profile`, profile, { withCredentials: true });
+      setUser(prev => ({ ...prev, ...res.data }));
+      toast.success("Perfil atualizado!");
+      navigate('/dashboard');
+    } catch (error) {
+      toast.error("Erro ao atualizar perfil");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const res = await axios.post(`${API}/user/profile/photo`, formData, {
+        withCredentials: true,
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      setUser(prev => ({ ...prev, picture: res.data.url }));
+      toast.success("Foto atualizada!");
+    } catch (error) {
+      toast.error("Erro ao enviar foto");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 py-8" data-testid="edit-profile-page">
+      <SEOHead title="Editar Perfil" />
+      
+      <div className="max-w-2xl mx-auto px-4">
+        <Card>
+          <CardHeader>
+            <h1 className="text-2xl font-bold text-slate-900" style={{ fontFamily: 'Outfit' }}>
+              Editar Perfil
+            </h1>
+          </CardHeader>
+          <CardContent>
+            {/* Profile Photo */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="relative">
+                <Avatar className="w-20 h-20">
+                  <AvatarImage src={user?.picture} />
+                  <AvatarFallback className="bg-[#1A4D2E] text-white text-2xl">
+                    {user?.name?.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                {uploading && (
+                  <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-white" />
+                  </div>
+                )}
+              </div>
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Alterar Foto
+                </Button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label>Nome</Label>
+                <Input
+                  value={profile.name}
+                  onChange={(e) => setProfile({...profile, name: e.target.value})}
+                  placeholder="Seu nome"
+                  className="mt-1"
+                />
+              </div>
+
+              {user?.role === 'dealer' && (
+                <div>
+                  <Label>Nome da Loja</Label>
+                  <Input
+                    value={profile.store_name}
+                    onChange={(e) => setProfile({...profile, store_name: e.target.value})}
+                    placeholder="Nome da sua loja"
+                    className="mt-1"
+                  />
+                </div>
+              )}
+
+              <div>
+                <Label>WhatsApp</Label>
+                <Input
+                  value={profile.phone}
+                  onChange={(e) => setProfile({...profile, phone: e.target.value})}
+                  placeholder="(67) 99999-9999"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label>Biografia</Label>
+                <Textarea
+                  value={profile.bio}
+                  onChange={(e) => setProfile({...profile, bio: e.target.value})}
+                  placeholder="Conte um pouco sobre você ou sua empresa..."
+                  rows={3}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label>Endereço Completo</Label>
+                <Textarea
+                  value={profile.address}
+                  onChange={(e) => setProfile({...profile, address: e.target.value})}
+                  placeholder="Rua, número, bairro, cidade - UF"
+                  rows={2}
+                  className="mt-1"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate('/dashboard')}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-[#1A4D2E] hover:bg-[#143d24]"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Salvar
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
 // Admin Login Page
 const AdminLoginPage = () => {
   const { admin, adminLogin } = useAdminAuth();
@@ -2356,8 +2840,13 @@ const AdminLoginPage = () => {
       
       <Card className="w-full max-w-md border-slate-700 bg-slate-800">
         <CardHeader className="text-center">
-          <div className="w-16 h-16 bg-[#1A4D2E] rounded-xl flex items-center justify-center mx-auto mb-4">
-            <Shield className="w-10 h-10 text-white" />
+          <div className="mx-auto mb-4">
+            {/* Logo para fundo escuro */}
+            <img 
+              src="/logo-dark.png" 
+              alt="TratorShop" 
+              className="h-12 w-auto object-contain mx-auto"
+            />
           </div>
           <h1 className="text-2xl font-bold text-white" style={{ fontFamily: 'Outfit' }}>
             Área Administrativa
@@ -2424,7 +2913,7 @@ const AdminLoginPage = () => {
 
 // Admin Change Password Page
 const AdminChangePasswordPage = () => {
-  const { admin, adminLogout } = useAdminAuth();
+  const { admin, adminLogout, checkAdminAuth } = useAdminAuth();
   const navigate = useNavigate();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -2458,6 +2947,8 @@ const AdminChangePasswordPage = () => {
         { withCredentials: true }
       );
       toast.success("Senha alterada com sucesso!");
+      // Update admin state to reflect password change
+      await checkAdminAuth();
       navigate('/admin');
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erro ao alterar senha");
@@ -2538,9 +3029,12 @@ const AdminPage = () => {
   const [listings, setListings] = useState([]);
   const [users, setUsers] = useState([]);
   const [dealers, setDealers] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [pendingUsers, setPendingUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('pending');
+  const [leadFilter, setLeadFilter] = useState('aguardando');
   const [activeTab, setActiveTab] = useState('dashboard');
   
   // Promote to Dealer Modal
@@ -2569,6 +3063,17 @@ const AdminPage = () => {
   const [showUserListingsModal, setShowUserListingsModal] = useState(false);
   const [userListings, setUserListings] = useState({ user: null, listings: [], total: 0 });
   const [loadingUserListings, setLoadingUserListings] = useState(false);
+
+  // Create User Modal
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [createUserData, setCreateUserData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    account_type: 'anuncio_unico',
+    password: ''
+  });
+  const [creatingUser, setCreatingUser] = useState(false);
 
   useEffect(() => {
     if (!admin) {
@@ -2631,13 +3136,34 @@ const AdminPage = () => {
     }
   };
 
+  const fetchLeads = async () => {
+    try {
+      const res = await axios.get(`${API}/admin/leads?status=${leadFilter}`, { withCredentials: true });
+      setLeads(res.data);
+    } catch (error) {
+      toast.error("Erro ao carregar leads");
+    }
+  };
+
+  const fetchPendingUsers = async () => {
+    try {
+      const res = await axios.get(`${API}/admin/users/pending`, { withCredentials: true });
+      setPendingUsers(res.data);
+    } catch (error) {
+      toast.error("Erro ao carregar usuários pendentes");
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'users') {
       fetchUsers();
+      fetchPendingUsers();
     } else if (activeTab === 'dealers') {
       fetchDealers();
+    } else if (activeTab === 'leads') {
+      fetchLeads();
     }
-  }, [activeTab]);
+  }, [activeTab, leadFilter]);
 
   const handleApprove = async (listingId) => {
     try {
@@ -2711,6 +3237,76 @@ const AdminPage = () => {
       fetchStats();
     } catch (error) {
       toast.error("Erro ao excluir usuário");
+    }
+  };
+
+  // Aprovar usuário pendente
+  const handleApproveUser = async (userId) => {
+    try {
+      await axios.post(`${API}/admin/users/${userId}/approve`, {}, { withCredentials: true });
+      toast.success("Usuário aprovado!");
+      fetchPendingUsers();
+      fetchUsers();
+      fetchStats();
+      fetchLeads();
+    } catch (error) {
+      toast.error("Erro ao aprovar usuário");
+    }
+  };
+
+  // Rejeitar usuário pendente
+  const handleRejectUser = async (userId) => {
+    if (!window.confirm("Tem certeza que deseja rejeitar este usuário?")) return;
+    try {
+      await axios.post(`${API}/admin/users/${userId}/reject`, {}, { withCredentials: true });
+      toast.success("Usuário rejeitado");
+      fetchPendingUsers();
+      fetchUsers();
+      fetchStats();
+      fetchLeads();
+    } catch (error) {
+      toast.error("Erro ao rejeitar usuário");
+    }
+  };
+
+  // Marcar lead como contatado
+  const handleMarkLeadContacted = async (userId, contacted) => {
+    try {
+      await axios.put(`${API}/admin/leads/${userId}/contacted`, { contacted }, { withCredentials: true });
+      toast.success(contacted ? "Lead marcado como contatado" : "Lead marcado como aguardando");
+      fetchLeads();
+      fetchStats();
+    } catch (error) {
+      toast.error("Erro ao atualizar status do lead");
+    }
+  };
+
+  // Criar usuário manualmente
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    if (!createUserData.name || !createUserData.email || !createUserData.phone) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    setCreatingUser(true);
+    try {
+      const res = await axios.post(`${API}/admin/users/create`, createUserData, { withCredentials: true });
+      toast.success(`Usuário criado! Senha: ${res.data.password}`);
+      setShowCreateUserModal(false);
+      setCreateUserData({
+        name: '',
+        email: '',
+        phone: '',
+        account_type: 'anuncio_unico',
+        password: ''
+      });
+      fetchUsers();
+      fetchStats();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Erro ao criar usuário");
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -2899,18 +3495,35 @@ const AdminPage = () => {
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#1A4D2E] rounded-lg flex items-center justify-center">
-                <Shield className="w-6 h-6 text-white" />
-              </div>
+              <img 
+                src="/logo-dark.png" 
+                alt="TratorShop" 
+                className="h-8 w-auto object-contain"
+              />
               <div>
                 <span className="font-bold text-white" style={{ fontFamily: 'Outfit' }}>
-                  TratorShop Admin
+                  Admin
                 </span>
                 <p className="text-xs text-slate-400">{admin.email}</p>
               </div>
             </div>
             
             <div className="flex items-center gap-4">
+              {/* Pending Users Badge */}
+              {stats?.users?.pending_approval > 0 && (
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setActiveTab('users')}
+                    className="text-amber-400 hover:text-amber-300 hover:bg-slate-700 relative"
+                  >
+                    <User className="w-5 h-5" />
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
+                      {stats.users.pending_approval}
+                    </span>
+                  </Button>
+                </div>
+              )}
               <Link to="/" className="text-slate-400 hover:text-white text-sm">
                 Ver Site
               </Link>
@@ -2946,6 +3559,9 @@ const AdminPage = () => {
             </TabsTrigger>
             <TabsTrigger value="users" className="data-[state=active]:bg-[#1A4D2E]">
               Usuários
+            </TabsTrigger>
+            <TabsTrigger value="leads" className="data-[state=active]:bg-[#1A4D2E]" data-testid="tab-leads">
+              Leads
             </TabsTrigger>
           </TabsList>
 
@@ -3161,6 +3777,38 @@ const AdminPage = () => {
                                   Criado: {new Date(listing.created_at).toLocaleDateString('pt-BR')}
                                   {listing.expires_at && ` • Expira: ${new Date(listing.expires_at).toLocaleDateString('pt-BR')}`}
                                 </p>
+                                {/* Show all images for pending listings */}
+                                {listing.images?.length > 0 && (
+                                  <div className="mt-3">
+                                    <p className="text-sm text-slate-400 mb-2">Fotos ({listing.images.length}):</p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {listing.images.map((img, idx) => (
+                                        <div key={idx} className="relative group">
+                                          <img 
+                                            src={`${API}/files/${img}`}
+                                            alt={`Foto ${idx + 1}`}
+                                            className="w-16 h-16 object-cover rounded border border-slate-600"
+                                          />
+                                          <button
+                                            onClick={async () => {
+                                              if (!window.confirm(`Excluir esta foto?`)) return;
+                                              try {
+                                                await axios.delete(`${API}/listings/${listing.listing_id}/images/${idx}`, { withCredentials: true });
+                                                toast.success("Foto excluída");
+                                                fetchListings();
+                                              } catch (error) {
+                                                toast.error("Erro ao excluir foto");
+                                              }
+                                            }}
+                                            className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                               <div className="flex flex-wrap gap-2 justify-end">
                                 {/* Edit button - always visible */}
@@ -3381,13 +4029,86 @@ const AdminPage = () => {
           </TabsContent>
 
           <TabsContent value="users">
+            {/* Pending Users Section */}
+            {pendingUsers.length > 0 && (
+              <Card className="bg-amber-900/30 border-amber-700 mb-6">
+                <CardHeader>
+                  <h2 className="text-lg font-semibold text-amber-400">
+                    ⏳ Aguardando Aprovação ({pendingUsers.length})
+                  </h2>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {pendingUsers.map(user => (
+                      <div key={user.user_id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-700 rounded-lg gap-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={user.picture} />
+                            <AvatarFallback className="bg-amber-600 text-white">
+                              {user.name?.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-white">{user.name}</p>
+                            <p className="text-sm text-slate-400">{user.email}</p>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              {user.phone && (
+                                <span className="text-xs text-green-400">📱 {user.phone}</span>
+                              )}
+                              {user.plan_type && (
+                                <Badge className={user.plan_type === 'lojista' ? 'bg-[#F9C02D] text-[#1A4D2E]' : 'bg-blue-600'}>
+                                  {user.plan_type === 'lojista' ? 'Lojista' : 'Anúncio Único'}
+                                </Badge>
+                              )}
+                              <span className="text-xs text-slate-500">
+                                {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-12 sm:ml-0">
+                          <Button 
+                            size="sm"
+                            onClick={() => handleApproveUser(user.user_id)}
+                            className="bg-green-600 hover:bg-green-700"
+                            data-testid={`approve-user-${user.user_id}`}
+                          >
+                            <Check className="w-4 h-4 mr-1" />
+                            Aprovar
+                          </Button>
+                          <Button 
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRejectUser(user.user_id)}
+                            className="text-red-400 border-red-700 hover:bg-red-900/50"
+                            data-testid={`reject-user-${user.user_id}`}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Rejeitar
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="bg-slate-800 border-slate-700">
-              <CardHeader>
-                <h2 className="text-lg font-semibold text-white">Usuários Registrados ({users.length})</h2>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">Usuários Ativos ({users.filter(u => u.status === 'active' || !u.status).length})</h2>
+                <Button 
+                  onClick={() => setShowCreateUserModal(true)}
+                  className="bg-[#1A4D2E] hover:bg-[#143d24]"
+                  data-testid="create-user-btn"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Criar Usuário
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {users.map(user => (
+                  {users.filter(u => u.status === 'active' || !u.status).map(user => (
                     <div key={user.user_id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-700 rounded-lg gap-3">
                       <div className="flex items-center gap-3">
                         <Avatar>
@@ -3498,6 +4219,116 @@ const AdminPage = () => {
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Leads Tab */}
+          <TabsContent value="leads">
+            <Card className="bg-slate-800 border-slate-700">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">
+                  📞 Leads / Cadastros Pendentes ({leads.length})
+                </h2>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm"
+                    variant={leadFilter === 'aguardando' ? 'default' : 'outline'}
+                    onClick={() => setLeadFilter('aguardando')}
+                    className={leadFilter === 'aguardando' 
+                      ? 'bg-amber-600 hover:bg-amber-700' 
+                      : 'border-slate-600 text-slate-300 hover:bg-slate-700'}
+                  >
+                    Aguardando
+                  </Button>
+                  <Button 
+                    size="sm"
+                    variant={leadFilter === 'contatado' ? 'default' : 'outline'}
+                    onClick={() => setLeadFilter('contatado')}
+                    className={leadFilter === 'contatado' 
+                      ? 'bg-green-600 hover:bg-green-700' 
+                      : 'border-slate-600 text-slate-300 hover:bg-slate-700'}
+                  >
+                    Contatados
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {leads.length === 0 ? (
+                  <p className="text-slate-400 text-center py-8">
+                    Nenhum lead {leadFilter === 'aguardando' ? 'aguardando contato' : 'contatado'}
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {leads.map(lead => (
+                      <div key={lead.lead_id || lead.user_id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-700 rounded-lg gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-white">{lead.name}</p>
+                            {lead.plan_type && (
+                              <Badge className={lead.plan_type === 'lojista' ? 'bg-[#F9C02D] text-[#1A4D2E]' : 'bg-blue-600'}>
+                                {lead.plan_type === 'lojista' ? 'Lojista - R$149' : 'Anúncio Único - R$49'}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-slate-400">{lead.email}</p>
+                          <div className="flex items-center gap-4 mt-2 flex-wrap">
+                            {lead.phone && (
+                              <a 
+                                href={`https://wa.me/55${lead.phone.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-green-400 hover:text-green-300 flex items-center gap-1"
+                              >
+                                <Phone className="w-4 h-4" />
+                                {lead.phone}
+                              </a>
+                            )}
+                            <span className="text-xs text-slate-500">
+                              Cadastro: {new Date(lead.created_at).toLocaleDateString('pt-BR')}
+                            </span>
+                            {lead.contacted_at && (
+                              <span className="text-xs text-green-500">
+                                Contatado: {new Date(lead.contacted_at).toLocaleDateString('pt-BR')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-0 sm:ml-4">
+                          {lead.status === 'aguardando' ? (
+                            <>
+                              <Button 
+                                size="sm"
+                                onClick={() => handleMarkLeadContacted(lead.user_id, true)}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                <Check className="w-4 h-4 mr-1" />
+                                Marcar Contatado
+                              </Button>
+                              <Button 
+                                size="sm"
+                                onClick={() => handleApproveUser(lead.user_id)}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                <Check className="w-4 h-4 mr-1" />
+                                Aprovar Usuário
+                              </Button>
+                            </>
+                          ) : (
+                            <Button 
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleMarkLeadContacted(lead.user_id, false)}
+                              className="text-amber-400 border-amber-700 hover:bg-amber-900/50"
+                            >
+                              Voltar p/ Aguardando
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -3905,6 +4736,93 @@ const AdminPage = () => {
                 </div>
               )}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create User Modal */}
+        <Dialog open={showCreateUserModal} onOpenChange={setShowCreateUserModal}>
+          <DialogContent className="bg-slate-800 border-slate-700">
+            <DialogHeader>
+              <DialogTitle className="text-white">Criar Novo Usuário</DialogTitle>
+              <DialogDescription className="text-slate-400">
+                O usuário será criado já aprovado e ativo
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreateUser} className="space-y-4 mt-4">
+              <div>
+                <Label className="text-slate-300">Nome *</Label>
+                <Input
+                  value={createUserData.name}
+                  onChange={(e) => setCreateUserData({...createUserData, name: e.target.value})}
+                  placeholder="Nome completo ou nome da loja"
+                  className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300">Email *</Label>
+                <Input
+                  type="email"
+                  value={createUserData.email}
+                  onChange={(e) => setCreateUserData({...createUserData, email: e.target.value})}
+                  placeholder="email@exemplo.com"
+                  className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300">WhatsApp *</Label>
+                <Input
+                  value={createUserData.phone}
+                  onChange={(e) => setCreateUserData({...createUserData, phone: e.target.value})}
+                  placeholder="(67) 99999-9999"
+                  className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300">Tipo de Conta *</Label>
+                <select
+                  value={createUserData.account_type}
+                  onChange={(e) => setCreateUserData({...createUserData, account_type: e.target.value})}
+                  className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
+                >
+                  <option value="anuncio_unico">Anúncio Único - R$49 (1 anúncio / 3 meses)</option>
+                  <option value="lojista">Lojista - R$149 (20 anúncios / 3 meses)</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-slate-300">Senha (opcional)</Label>
+                <Input
+                  type="text"
+                  value={createUserData.password}
+                  onChange={(e) => setCreateUserData({...createUserData, password: e.target.value})}
+                  placeholder="Deixe vazio para gerar automaticamente"
+                  className="mt-1 bg-slate-700 border-slate-600 text-white"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  A senha será exibida após criar o usuário
+                </p>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowCreateUserModal(false)}
+                  className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={creatingUser}
+                  className="flex-1 bg-[#1A4D2E] hover:bg-[#143d24]"
+                >
+                  {creatingUser ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                  Criar Usuário
+                </Button>
+              </div>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
@@ -4490,6 +5408,163 @@ const StorePage = () => {
   );
 };
 
+// Seller Public Profile Page (SEO-friendly)
+const SellerProfilePage = () => {
+  const { userId } = useParams();
+  const [seller, setSeller] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const fetchSeller = async () => {
+      setLoading(true);
+      try {
+        const res = await axios.get(`${API}/vendedor/${userId}`);
+        setSeller(res.data);
+      } catch (error) {
+        console.error("Error fetching seller:", error);
+        setSeller(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSeller();
+  }, [userId]);
+
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 0
+    }).format(price);
+  };
+
+  const handleShareProfile = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      toast.success("Link copiado!");
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleWhatsAppClick = () => {
+    if (!seller?.phone) return;
+    const phone = seller.phone.replace(/\D/g, '');
+    const message = encodeURIComponent(`Olá! Vi seu perfil no TratorShop.`);
+    window.open(`https://wa.me/55${phone}?text=${message}`, '_blank');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-12 h-12 animate-spin text-[#1A4D2E]" />
+      </div>
+    );
+  }
+
+  if (!seller) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <User className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Vendedor não encontrado</h1>
+          <p className="text-slate-500 mb-6">Este perfil não existe ou não está disponível.</p>
+          <Link to="/">
+            <Button className="bg-[#1A4D2E] hover:bg-[#143d24]">
+              Voltar ao início
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50" data-testid="seller-profile-page">
+      <SEOHead 
+        title={`${seller.name} - Vendedor | TratorShop`}
+        description={seller.bio || `Veja os anúncios de ${seller.name} no TratorShop`}
+      />
+      
+      {/* Profile Header */}
+      <div className="bg-gradient-to-b from-[#1A4D2E] to-[#143d24] py-12">
+        <div className="max-w-4xl mx-auto px-4 md:px-8">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+            <Avatar className="w-24 h-24 border-4 border-white shadow-lg">
+              {seller.picture ? (
+                <AvatarImage src={seller.picture.startsWith('http') ? seller.picture : `${API}/files/${seller.picture}`} />
+              ) : null}
+              <AvatarFallback className="bg-[#F9C02D] text-[#1A4D2E] text-3xl">
+                {seller.name?.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 text-center md:text-left">
+              <h1 className="text-2xl md:text-3xl font-bold text-white mb-2" style={{ fontFamily: 'Outfit' }}>
+                {seller.name}
+              </h1>
+              {seller.role === 'dealer' && (
+                <Badge className="bg-[#F9C02D] text-[#1A4D2E] mb-3">
+                  <Store className="w-3 h-3 mr-1" />
+                  Lojista
+                </Badge>
+              )}
+              {seller.bio && (
+                <p className="text-white/80 mb-4">{seller.bio}</p>
+              )}
+              {seller.address && (
+                <p className="text-white/60 text-sm flex items-center justify-center md:justify-start gap-1">
+                  <MapPin className="w-4 h-4" />
+                  {seller.address}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-3">
+              {seller.phone && (
+                <Button 
+                  onClick={handleWhatsAppClick}
+                  className="bg-green-500 hover:bg-green-600"
+                >
+                  <Phone className="w-4 h-4 mr-2" />
+                  WhatsApp
+                </Button>
+              )}
+              <Button 
+                variant="outline"
+                onClick={handleShareProfile}
+                className="border-white text-white hover:bg-white/10"
+              >
+                {copied ? <Check className="w-4 h-4 mr-2" /> : <Share2 className="w-4 h-4 mr-2" />}
+                {copied ? 'Copiado!' : 'Compartilhar'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Listings */}
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
+        <h2 className="text-xl font-semibold text-slate-900 mb-6" style={{ fontFamily: 'Outfit' }}>
+          Anúncios ({seller.total_listings})
+        </h2>
+        
+        {seller.listings?.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {seller.listings.map(listing => (
+              <ListingCard key={listing.listing_id} listing={listing} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-500">Este vendedor ainda não tem anúncios ativos.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // App Router
 const AppRouter = () => {
   const location = useLocation();
@@ -4529,9 +5604,11 @@ const AppRouter = () => {
           <Route path="/anunciar" element={<ListingFormPage />} />
           <Route path="/editar/:id" element={<ListingFormPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/perfil/editar" element={<EditProfilePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/lojas" element={<StoresListPage />} />
           <Route path="/loja/:slug" element={<StorePage />} />
+          <Route path="/vendedor/:userId" element={<SellerProfilePage />} />
         </Routes>
       </main>
       <Footer />
