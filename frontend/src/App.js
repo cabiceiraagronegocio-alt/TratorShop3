@@ -3234,6 +3234,20 @@ const AdminPage = () => {
   const [tempPassword, setTempPassword] = useState('');
   const [savingAdvancedEdit, setSavingAdvancedEdit] = useState(false);
 
+  // Site Settings
+  const [siteSettings, setSiteSettings] = useState({
+    contacts: {
+      phone: '',
+      whatsapp: '',
+      email: '',
+      city: '',
+      address: ''
+    },
+    social_links: []
+  });
+  const [savingSiteSettings, setSavingSiteSettings] = useState(false);
+  const [loadingSiteSettings, setLoadingSiteSettings] = useState(false);
+
   useEffect(() => {
     if (!admin) {
       navigate('/admin-login');
@@ -3249,6 +3263,9 @@ const AdminPage = () => {
   useEffect(() => {
     if (activeTab === 'listings') {
       fetchListings();
+    }
+    if (activeTab === 'settings') {
+      fetchSiteSettings();
     }
   }, [filter, activeTab]);
 
@@ -3700,6 +3717,51 @@ const AdminPage = () => {
     navigate('/admin-login');
   };
 
+  const fetchSiteSettings = async () => {
+    setLoadingSiteSettings(true);
+    try {
+      const res = await axios.get(`${API}/site-settings`);
+      setSiteSettings(res.data);
+    } catch (error) {
+      console.error("Error fetching site settings:", error);
+      toast.error("Erro ao carregar configurações");
+    } finally {
+      setLoadingSiteSettings(false);
+    }
+  };
+
+  const handleSaveSiteSettings = async () => {
+    setSavingSiteSettings(true);
+    try {
+      await axios.put(`${API}/admin/site-settings`, siteSettings, { withCredentials: true });
+      toast.success("Configurações salvas com sucesso!");
+    } catch (error) {
+      console.error("Error saving site settings:", error);
+      toast.error("Erro ao salvar configurações");
+    } finally {
+      setSavingSiteSettings(false);
+    }
+  };
+
+  const handleAddSiteSocialLink = () => {
+    setSiteSettings({
+      ...siteSettings,
+      social_links: [...(siteSettings.social_links || []), { name: '', url: '' }]
+    });
+  };
+
+  const handleRemoveSiteSocialLink = (index) => {
+    const newLinks = [...siteSettings.social_links];
+    newLinks.splice(index, 1);
+    setSiteSettings({ ...siteSettings, social_links: newLinks });
+  };
+
+  const handleUpdateSiteSocialLink = (index, field, value) => {
+    const newLinks = [...siteSettings.social_links];
+    newLinks[index][field] = value;
+    setSiteSettings({ ...siteSettings, social_links: newLinks });
+  };
+
   const formatPrice = (price) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -3786,6 +3848,10 @@ const AdminPage = () => {
             </TabsTrigger>
             <TabsTrigger value="leads" className="data-[state=active]:bg-[#1A4D2E]" data-testid="tab-leads">
               Leads
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="data-[state=active]:bg-[#1A4D2E]" data-testid="tab-settings">
+              <Settings className="w-4 h-4 mr-2" />
+              Configurações
             </TabsTrigger>
           </TabsList>
 
@@ -4585,6 +4651,183 @@ const AdminPage = () => {
                       </div>
                     ))}
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings">
+            <Card className="bg-slate-800 border-slate-700">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  Configurações do Site
+                </CardTitle>
+                <CardDescription className="text-slate-400">
+                  Gerencie as informações de contato e redes sociais do TratorShop que aparecem no footer e perfis públicos
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {loadingSiteSettings ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-[#1A4D2E]" />
+                  </div>
+                ) : (
+                  <>
+                    {/* Contacts Section */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-white border-b border-slate-700 pb-2">
+                        📞 Contatos Principais
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-slate-300">Telefone Principal</Label>
+                          <Input
+                            value={siteSettings.contacts?.phone || ''}
+                            onChange={(e) => setSiteSettings({
+                              ...siteSettings,
+                              contacts: { ...siteSettings.contacts, phone: e.target.value }
+                            })}
+                            placeholder="(67) 3333-4444"
+                            className="mt-1 bg-slate-700 border-slate-600 text-white"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-slate-300">WhatsApp Oficial</Label>
+                          <Input
+                            value={siteSettings.contacts?.whatsapp || ''}
+                            onChange={(e) => setSiteSettings({
+                              ...siteSettings,
+                              contacts: { ...siteSettings.contacts, whatsapp: e.target.value }
+                            })}
+                            placeholder="(67) 99999-9999"
+                            className="mt-1 bg-slate-700 border-slate-600 text-white"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-slate-300">Email de Contato</Label>
+                          <Input
+                            type="email"
+                            value={siteSettings.contacts?.email || ''}
+                            onChange={(e) => setSiteSettings({
+                              ...siteSettings,
+                              contacts: { ...siteSettings.contacts, email: e.target.value }
+                            })}
+                            placeholder="contato@tratorshop.com.br"
+                            className="mt-1 bg-slate-700 border-slate-600 text-white"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-slate-300">Cidade Base</Label>
+                          <Input
+                            value={siteSettings.contacts?.city || ''}
+                            onChange={(e) => setSiteSettings({
+                              ...siteSettings,
+                              contacts: { ...siteSettings.contacts, city: e.target.value }
+                            })}
+                            placeholder="Campo Grande, MS"
+                            className="mt-1 bg-slate-700 border-slate-600 text-white"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label className="text-slate-300">Endereço (opcional)</Label>
+                          <Input
+                            value={siteSettings.contacts?.address || ''}
+                            onChange={(e) => setSiteSettings({
+                              ...siteSettings,
+                              contacts: { ...siteSettings.contacts, address: e.target.value }
+                            })}
+                            placeholder="Rua Exemplo, 123 - Centro"
+                            className="mt-1 bg-slate-700 border-slate-600 text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Social Links Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-700 pb-2">
+                        <h3 className="text-lg font-semibold text-white">
+                          🌍 Redes Sociais
+                        </h3>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleAddSiteSocialLink}
+                          className="bg-[#1A4D2E] hover:bg-[#143d24]"
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Adicionar Rede
+                        </Button>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {(siteSettings.social_links || []).map((link, index) => (
+                          <div key={index} className="flex items-center gap-2 p-3 bg-slate-700 rounded-lg">
+                            <Input
+                              placeholder="Nome (ex: Instagram, Facebook, YouTube)"
+                              value={link.name}
+                              onChange={(e) => handleUpdateSiteSocialLink(index, 'name', e.target.value)}
+                              className="bg-slate-600 border-slate-500 text-white w-1/3"
+                            />
+                            <Input
+                              placeholder="URL completa ou @usuario (Instagram)"
+                              value={link.url}
+                              onChange={(e) => handleUpdateSiteSocialLink(index, 'url', e.target.value)}
+                              className="flex-1 bg-slate-600 border-slate-500 text-white"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRemoveSiteSocialLink(index)}
+                              className="text-red-400 border-red-700 hover:bg-red-900/50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        
+                        {(!siteSettings.social_links || siteSettings.social_links.length === 0) && (
+                          <div className="text-center py-8 bg-slate-700/50 rounded-lg">
+                            <p className="text-slate-400">Nenhuma rede social adicionada</p>
+                            <p className="text-xs text-slate-500 mt-1">Clique em "Adicionar Rede" para incluir</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 mt-4">
+                        <p className="text-blue-400 text-sm font-medium mb-2">💡 Dica para Instagram:</p>
+                        <p className="text-slate-300 text-xs">
+                          Você pode digitar apenas <code className="bg-slate-800 px-1 py-0.5 rounded">@usuario</code> ou 
+                          <code className="bg-slate-800 px-1 py-0.5 rounded ml-1">usuario</code> que o sistema converte automaticamente 
+                          para <code className="bg-slate-800 px-1 py-0.5 rounded ml-1">https://instagram.com/usuario</code>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Save Button */}
+                    <div className="flex justify-end pt-4 border-t border-slate-700">
+                      <Button
+                        onClick={handleSaveSiteSettings}
+                        disabled={savingSiteSettings}
+                        className="bg-[#1A4D2E] hover:bg-[#143d24] px-8"
+                      >
+                        {savingSiteSettings ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            Salvando...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4 mr-2" />
+                            Salvar Configurações
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
