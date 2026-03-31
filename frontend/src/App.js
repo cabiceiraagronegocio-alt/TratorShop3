@@ -2770,11 +2770,14 @@ const EditProfilePage = () => {
     e.preventDefault();
     setLoading(true);
     try {
+      console.log('📤 Enviando perfil para API:', profile);
       const res = await axios.put(`${API}/user/profile`, profile, { withCredentials: true });
+      console.log('✅ Resposta da API:', res.data);
       setUser(prev => ({ ...prev, ...res.data }));
       toast.success("Perfil atualizado!");
       navigate('/dashboard');
     } catch (error) {
+      console.error('❌ Erro ao atualizar perfil:', error);
       toast.error("Erro ao atualizar perfil");
     } finally {
       setLoading(false);

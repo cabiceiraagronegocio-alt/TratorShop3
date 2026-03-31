@@ -819,6 +819,9 @@ async def update_user_profile(data: UserProfileUpdate, request: Request):
     """Update user profile"""
     user = await require_user(request)
     
+    print(f"📥 Recebendo update de perfil para user {user['user_id']}")
+    print(f"📦 Dados recebidos: {data.model_dump()}")
+    
     update_data = {}
     if data.name is not None:
         update_data["name"] = data.name
@@ -839,7 +842,11 @@ async def update_user_profile(data: UserProfileUpdate, request: Request):
         update_data["website"] = data.website
     if data.instagram is not None:
         # Normalize Instagram URL
-        update_data["instagram"] = normalize_instagram_url(data.instagram)
+        normalized_instagram = normalize_instagram_url(data.instagram)
+        update_data["instagram"] = normalized_instagram
+        print(f"🔄 Instagram normalizado: '{data.instagram}' → '{normalized_instagram}'")
+    
+    print(f"💾 Salvando no banco: {update_data}")
     
     if update_data:
         await db.users.update_one(
@@ -849,6 +856,7 @@ async def update_user_profile(data: UserProfileUpdate, request: Request):
     
     # Return updated user
     updated_user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "password_hash": 0})
+    print(f"✅ Usuário atualizado, instagram no banco: {updated_user.get('instagram', 'NÃO DEFINIDO')}")
     return updated_user
 
 @api_router.post("/user/profile/photo")
