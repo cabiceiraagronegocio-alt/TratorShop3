@@ -272,6 +272,29 @@ class AdminUpdateUser(BaseModel):
     is_admin: Optional[bool] = None
     role: Optional[str] = None
     max_listings: Optional[int] = None
+    # Novos campos para gerenciamento completo
+    store_name: Optional[str] = None
+    phone: Optional[str] = None
+    username: Optional[str] = None
+    status: Optional[str] = None  # active, pending_approval, blocked
+    bio: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    website: Optional[str] = None
+    # Plano
+    plan_type: Optional[str] = None
+    plan_expires_at: Optional[str] = None
+    plan_status: Optional[str] = None  # active, expired
+    # Redes sociais
+    social_links: Optional[List[dict]] = None
+
+class SocialLink(BaseModel):
+    name: str
+    url: str
+
+class AdminResetPassword(BaseModel):
+    new_password: str
+    force_change: Optional[bool] = False
 
 class AdminUpdateListing(BaseModel):
     title: Optional[str] = None
@@ -1438,7 +1461,7 @@ async def get_admin_stats(request: Request):
 @api_router.put("/admin/users/{user_id}")
 async def admin_update_user(user_id: str, data: AdminUpdateUser, request: Request):
     """Admin update user details"""
-    await require_admin(request)
+    admin = await require_admin(request)
     
     user = await db.users.find_one({"user_id": user_id})
     if not user:
@@ -1448,6 +1471,14 @@ async def admin_update_user(user_id: str, data: AdminUpdateUser, request: Reques
     
     if update_data:
         await db.users.update_one({"user_id": user_id}, {"$set": update_data})
+        
+        # Log the action
+        await log_admin_action(
+            admin_id=admin["user_id"],
+            action="update_user",
+            target_user_id=user_id,
+            details={"updated_fields": list(update_data.keys())}
+        )
     
     updated_user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
     return updated_user
@@ -2194,6 +2225,113 @@ async def approve_user(user_id: str, request: Request):
     )
     
     return {"message": "Usuário aprovado com sucesso"}
+
+# Helper function for admin action logging
+async def log_admin_action(admin_id: str, action: str, target_user_id: str, details: dict = None):
+    """Log admin actions for audit trail"""
+    log_entry = {
+        "log_id": str(uuid.uuid4()),
+        "admin_id": admin_id,
+        "action": action,
+        "target_user_id": target_user_id,
+        "details": details or {},
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    await db.admin_logs.insert_one(log_entry)
+
+@api_router.post("/admin/users/{user_id}/reset-password")
+async def admin_reset_user_password(user_id: str, data: AdminResetPassword, request: Request):
+    """Admin reset user password (support function)"""
+    admin = await require_admin(request)
+    
+    user = await db.users.find_one({"user_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Hash the new password
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    hashed_password = pwd_context.hash(data.new_password)
+    
+    # Update user password
+    update_data = {
+        "password_hash": hashed_password,
+        "password_reset_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    if data.force_change:
+        update_data["force_password_change"] = True
+    
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": update_data}
+    )
+    
+    # Log the action
+    await log_admin_action(
+        admin_id=admin["user_id"],
+        action="reset_password",
+        target_user_id=user_id,
+        details={"force_change": data.force_change}
+    )
+    
+    return {
+        "message": "Senha redefinida com sucesso",
+        "force_change": data.force_change
+    }
+
+@api_router.post("/admin/users/{user_id}/generate-temp-password")
+async def admin_generate_temp_password(user_id: str, request: Request):
+    """Admin generate temporary password for user"""
+    admin = await require_admin(request)
+    
+    user = await db.users.find_one({"user_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Generate random temporary password
+    temp_password = secrets.token_urlsafe(12)[:16]  # 16 character password
+    
+    # Hash the password
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    hashed_password = pwd_context.hash(temp_password)
+    
+    # Update user password with force change
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "password_hash": hashed_password,
+            "force_password_change": True,
+            "temp_password_generated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Log the action
+    await log_admin_action(
+        admin_id=admin["user_id"],
+        action="generate_temp_password",
+        target_user_id=user_id
+    )
+    
+    return {
+        "message": "Senha temporária gerada",
+        "temp_password": temp_password,
+        "user_email": user.get("email"),
+        "warning": "Esta senha será exibida apenas uma vez. Envie ao usuário de forma segura."
+    }
+
+@api_router.get("/admin/logs")
+async def get_admin_logs(request: Request, limit: int = Query(100, le=500)):
+    """Get admin action logs (audit trail)"""
+    await require_admin(request)
+    
+    logs = await db.admin_logs.find(
+        {},
+        {"_id": 0}
+    ).sort("timestamp", -1).limit(limit).to_list(limit)
+    
+    return logs
 
 @api_router.post("/admin/users/{user_id}/reject")
 async def reject_user(user_id: str, request: Request):
