@@ -1252,6 +1252,43 @@ async def get_seller_public_profile(user_id: str):
     
     return profile
 
+@api_router.get("/users/{user_id}/listings")
+async def search_user_listings(
+    user_id: str,
+    search: Optional[str] = Query(None, description="Search query for filtering listings")
+):
+    """Search listings from a specific user - for seller minisite search"""
+    # Verify user exists and is active
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user or user.get("status") != "active":
+        raise HTTPException(status_code=404, detail="Vendedor não encontrado")
+    
+    # Build query for active listings from this user
+    query = {
+        "user_id": user_id,
+        "status": "approved"
+    }
+    
+    # Add search filter if provided
+    if search and search.strip():
+        search_term = search.strip()
+        query["$or"] = [
+            {"title": {"$regex": search_term, "$options": "i"}},
+            {"description": {"$regex": search_term, "$options": "i"}},
+            {"brand": {"$regex": search_term, "$options": "i"}},
+            {"model": {"$regex": search_term, "$options": "i"}},
+            {"category": {"$regex": search_term, "$options": "i"}}
+        ]
+    
+    # Get filtered listings
+    listings = await db.listings.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    
+    return {
+        "listings": listings,
+        "total": len(listings),
+        "user_id": user_id
+    }
+
 @api_router.get("/dealer/profile")
 async def get_dealer_profile(request: Request):
     """Get current user's dealer profile"""
