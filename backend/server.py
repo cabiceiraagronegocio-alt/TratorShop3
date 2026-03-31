@@ -248,6 +248,8 @@ class UserProfileUpdate(BaseModel):
     bio: Optional[str] = None
     address: Optional[str] = None
     store_name: Optional[str] = None
+    website: Optional[str] = None
+    instagram: Optional[str] = None  # Will be normalized to full URL
 
 # Plan Selection Model
 class PlanSelection(BaseModel):
@@ -295,6 +297,17 @@ class SocialLink(BaseModel):
 class AdminResetPassword(BaseModel):
     new_password: str
     force_change: Optional[bool] = False
+
+class SiteContacts(BaseModel):
+    phone: Optional[str] = None
+    whatsapp: Optional[str] = None
+    email: Optional[str] = None
+    city: Optional[str] = None
+    address: Optional[str] = None
+
+class SiteSettings(BaseModel):
+    contacts: Optional[SiteContacts] = None
+    social_links: Optional[List[dict]] = None
 
 class AdminUpdateListing(BaseModel):
     title: Optional[str] = None
@@ -822,6 +835,11 @@ async def update_user_profile(data: UserProfileUpdate, request: Request):
         update_data["address"] = data.address
     if data.store_name is not None:
         update_data["store_name"] = data.store_name
+    if data.website is not None:
+        update_data["website"] = data.website
+    if data.instagram is not None:
+        # Normalize Instagram URL
+        update_data["instagram"] = normalize_instagram_url(data.instagram)
     
     if update_data:
         await db.users.update_one(
@@ -2332,6 +2350,78 @@ async def get_admin_logs(request: Request, limit: int = Query(100, le=500)):
     ).sort("timestamp", -1).limit(limit).to_list(limit)
     
     return logs
+
+# Helper function to normalize Instagram URLs
+def normalize_instagram_url(value: str) -> str:
+    """Normalize Instagram username/URL to full URL"""
+    if not value:
+        return value
+    
+    value = value.strip()
+    
+    # Already a full URL
+    if value.startswith('http://') or value.startswith('https://'):
+        return value
+    
+    # Remove @ if present
+    if value.startswith('@'):
+        value = value[1:]
+    
+    # Build Instagram URL
+    return f"https://instagram.com/{value}"
+
+@api_router.get("/site-settings")
+async def get_site_settings():
+    """Get global site settings (public)"""
+    settings = await db.site_settings.find_one({}, {"_id": 0})
+    
+    if not settings:
+        # Return default empty settings
+        return {
+            "contacts": {
+                "phone": "",
+                "whatsapp": "",
+                "email": "",
+                "city": "",
+                "address": ""
+            },
+            "social_links": []
+        }
+    
+    return settings
+
+@api_router.put("/admin/site-settings")
+async def update_site_settings(data: SiteSettings, request: Request):
+    """Update global site settings (admin only)"""
+    admin = await require_admin(request)
+    
+    # Normalize Instagram URLs in social_links
+    if data.social_links:
+        for link in data.social_links:
+            if link.get('name', '').lower() == 'instagram':
+                link['url'] = normalize_instagram_url(link.get('url', ''))
+    
+    settings_data = data.model_dump(exclude_none=True)
+    settings_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    settings_data['updated_by'] = admin['user_id']
+    
+    # Upsert (update or insert)
+    await db.site_settings.update_one(
+        {},
+        {"$set": settings_data},
+        upsert=True
+    )
+    
+    # Log the action
+    await log_admin_action(
+        admin_id=admin["user_id"],
+        action="update_site_settings",
+        target_user_id="system",
+        details={"updated_fields": list(settings_data.keys())}
+    )
+    
+    updated = await db.site_settings.find_one({}, {"_id": 0})
+    return updated
 
 @api_router.post("/admin/users/{user_id}/reject")
 async def reject_user(user_id: str, request: Request):
