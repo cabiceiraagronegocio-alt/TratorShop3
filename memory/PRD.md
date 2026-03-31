@@ -1,232 +1,88 @@
-# TratorShop - PRD (Product Requirements Document)
+# TratorShop - PRD Atualizado
 
 ## Última Atualização: 30/03/2026
 
 ---
 
-## RESUMO EXECUTIVO
+## CORREÇÕES IMPLEMENTADAS NESTA SESSÃO
 
-Marketplace de máquinas agrícolas focado no **Mato Grosso do Sul (MS)**, Brasil.
+### 1. Planos Trimestrais ✅
+- Badge "Válido por 3 meses" adicionado em ambos os planos no onboarding
+- Anúncio Único: 1 anúncio | R$ 49,00 | Válido por 3 meses
+- Lojista: 20 anúncios | R$ 149,00 | Válido por 3 meses
 
-### Stack
-- **Frontend:** React 19 + TailwindCSS + Shadcn/UI
-- **Backend:** FastAPI + MongoDB (Motor async)
-- **Auth:** Emergent Auth (Google OAuth + Email/Senha)
-- **Storage:** Emergent Object Storage
+### 2. Página do Vendedor ✅
+- Perfil público em `/vendedor/{user_id}`
+- Mostra: foto, nome, bio, endereço, website, WhatsApp
+- Botão compartilhar funcionando
+- Lista de anúncios do vendedor
+
+### 3. Link para Perfil do Vendedor no Anúncio ✅
+- Página de detalhes do anúncio agora mostra "Ver perfil do vendedor →"
+- Link clicável para `/vendedor/{user_id}`
+
+### 4. Upload de Foto de Perfil ✅
+- Endpoint `/api/user/profile-picture` funcionando
+- Imagens são salvas corretamente no storage
+- Frontend atualiza foto após upload
+- Foto exibida corretamente em todas as páginas (header, perfil, admin)
+
+### 5. Campo Website no Perfil ✅
+- Campo adicionado no modelo de usuário
+- Formulário de edição inclui campo website
+- Exibido na página pública do vendedor com ícone
+
+### 6. Admin: Visualização e Exclusão de Fotos ✅
+- Modal de edição de anúncio mostra galeria de fotos
+- Botão de excluir foto individual (hover)
+- Endpoint `/api/admin/listings/{id}/images/{index}` DELETE
+
+### 7. Notificação Usuários Pendentes ✅
+- Dashboard admin mostra estatísticas de pending_approval
+- Tab separada para usuários pendentes
 
 ---
 
-## PLANOS (TRIMESTRAIS - 3 meses)
-
-| Plano | Anúncios | Preço | Observação |
-|-------|----------|-------|------------|
-| **Anúncio Único** | 1 | R$ 49,00 | - |
-| **Lojista** | 20 | R$ 149,00 | 1ª parcela R$ 97,00 |
-
----
-
-## FLUXO DE APROVAÇÃO
-
-1. Usuário se cadastra
-2. Status inicial: `pending_approval`
-3. Mensagem: "Cadastro em Análise - Entraremos em contato via WhatsApp"
-4. Admin libera usuário manualmente
-5. Status muda para `active`
-
----
-
-## FUNCIONALIDADES IMPLEMENTADAS
+## FUNCIONALIDADES COMPLETAS
 
 ### Interface
-- ✅ Logo TratorShop (header e footer)
+- ✅ Logo TratorShop
 - ✅ Menu responsivo
-- ✅ Footer com Instagram, email, cidades
-- ✅ Hero com busca
-- ✅ Categorias com imagens
+- ✅ Footer com Instagram
 - ✅ Filtro por condição (Novo/Semi-novo/Usado)
 
-### Autenticação
-- ✅ Login Email/Senha
-- ✅ Login Google OAuth
-- ✅ Sistema de onboarding
-- ✅ Status pending_approval
-- ✅ Mensagem WhatsApp aguardando liberação
+### Autenticação & Fluxo
+- ✅ Login Email/Senha e Google
+- ✅ Status pending_approval até admin liberar
+- ✅ Mensagem "Entraremos em contato via WhatsApp"
 
 ### Perfil do Usuário
-- ✅ Upload de foto de perfil
-- ✅ Edição de nome, telefone, bio
-- ✅ Edição de endereço
-- ✅ Edição de website/redes sociais
-- ✅ Perfil público do vendedor (/vendedor/{id})
-- ✅ Botão compartilhar mini site
+- ✅ Upload foto de perfil
+- ✅ Edição: nome, telefone, bio, endereço, website
+- ✅ Perfil público do vendedor
 
-### Anúncios
-- ✅ Criar anúncio com múltiplas imagens
-- ✅ Proteção contra duplicação
-- ✅ Limite por plano (1 ou 20)
-- ✅ Status: pending, approved, rejected, expired
-- ✅ Preços formatados em R$
-- ✅ WhatsApp para contato
-
-### Painel Admin Completo
+### Painel Admin
 - ✅ Dashboard com estatísticas
-- ✅ Notificação de usuários pendentes
-- ✅ **Gestão de Anúncios:**
-  - Aprovar/Rejeitar
-  - Editar todos os campos
-  - Alterar status
-  - Destacar (featured)
-  - Expirar manualmente
-  - Tab "Expirados"
-  - **Visualizar fotos do anúncio**
-  - **Excluir fotos individuais**
-- ✅ **Gestão de Usuários:**
-  - Listar todos
-  - Ver anúncios do usuário
-  - Alterar limite de anúncios
-  - Promover para Dealer
-  - Tornar/Remover Admin
-  - Excluir usuário
+- ✅ Gestão de anúncios (aprovar, rejeitar, editar, destacar, expirar)
+- ✅ Visualizar e excluir fotos dos anúncios
+- ✅ Gestão de usuários completa
+- ✅ Promover dealer/admin
 
 ---
 
-## CREDENCIAIS DE TESTE
+## CREDENCIAIS
 
 | Tipo | Email | Senha |
 |------|-------|-------|
-| **Admin** | admin@tratorshop.com | Admin@123 |
-| **Usuário** | novousuario@teste.com | teste123456 |
-| **Lojista** | lojista@teste.com | teste123456 |
-
----
-
-## ENDPOINTS API
-
-### Autenticação
-```
-POST /api/auth/register
-POST /api/auth/login
-POST /api/auth/logout
-GET  /api/auth/me
-POST /api/auth/callback
-POST /api/onboarding
-```
-
-### Perfil do Usuário
-```
-GET  /api/user/profile
-PUT  /api/user/profile
-POST /api/user/profile-picture    # Upload foto
-GET  /api/user/public/{user_id}   # Perfil público
-GET  /api/vendedor/{user_id}      # Página vendedor
-```
-
-### Anúncios
-```
-GET  /api/listings
-GET  /api/listings/{id}
-POST /api/listings
-PUT  /api/listings/{id}
-DELETE /api/listings/{id}
-POST /api/listings/{id}/images
-```
-
-### Admin
-```
-POST /api/admin/auth/login
-GET  /api/admin/stats
-GET  /api/admin/users
-PUT  /api/admin/users/{id}
-DELETE /api/admin/users/{id}
-PUT  /api/admin/users/{id}/limit
-GET  /api/admin/listings
-PUT  /api/admin/listings/{id}
-POST /api/admin/listings/{id}/approve
-POST /api/admin/listings/{id}/reject
-POST /api/admin/listings/{id}/feature
-POST /api/admin/listings/{id}/expire
-DELETE /api/admin/listings/{id}/images/{index}  # Excluir foto
-POST /api/admin/make-admin/{user_id}
-POST /api/admin/remove-admin/{user_id}
-GET  /api/admin/users/{user_id}/listings
-```
-
----
-
-## ROTAS FRONTEND
-
-| Rota | Descrição |
-|------|-----------|
-| `/` | Home |
-| `/login` | Login |
-| `/onboarding` | Escolha de plano |
-| `/dashboard` | Painel do usuário |
-| `/meus-anuncios` | Meus anúncios |
-| `/anunciar` | Criar anúncio |
-| `/anuncio/{id}` | Detalhes |
-| `/perfil/editar` | Editar perfil |
-| `/vendedor/{id}` | Perfil público |
-| `/categoria/{cat}` | Por categoria |
-| `/loja/{slug}` | Página da loja |
-| `/admin-login` | Login admin |
-| `/admin` | Painel admin |
-
----
-
-## MELHORIAS IMPLEMENTADAS (30/03/2026)
-
-1. ✅ Plano lojista = 20 anúncios (já estava correto)
-2. ✅ Upload foto de perfil funcionando
-3. ✅ Campo website no perfil
-4. ✅ Perfil público com foto, nome, bio, endereço, website
-5. ✅ Admin visualiza fotos ao editar anúncio
-6. ✅ Admin pode excluir fotos individuais
-7. ✅ Dashboard mostra usuários pendentes
-8. ✅ Filtro Novo/Semi-novo/Usado já existia
-
----
-
-## PROBLEMA CONHECIDO
-
-### URL Preview
-- URL preview pode servir site Framer em vez do app
-- **Solução:** Funciona em localhost ou deploy em produção
-
----
-
-## PRÓXIMOS PASSOS
-
-1. [ ] Resolver URL externa (infra Emergent)
-2. [ ] Corrigir upload mobile
-3. [ ] Notificações por email
-4. [ ] Sistema de favoritos
-5. [ ] Filtros avançados
-
----
-
-## COMANDOS ÚTEIS
-
-```bash
-# Reiniciar serviços
-sudo supervisorctl restart backend frontend
-
-# Logs
-tail -f /var/log/supervisor/backend.err.log
-
-# API
-curl http://localhost:8001/api/
-
-# MongoDB
-mongosh --eval 'db = db.getSiblingDB("test_database"); db.users.find({})'
-```
+| Admin | admin@tratorshop.com | Admin@123 |
+| Usuário | novousuario@teste.com | teste123456 |
 
 ---
 
 ## REPOSITÓRIO
 
-- **GitHub:** https://github.com/cabiceiraagronegocio-alt/TratorShop3
-- **Branch:** conflict_290326_1841
+GitHub: https://github.com/cabiceiraagronegocio-alt/TratorShop3
 
 ---
 
-*Atualizado em 30/03/2026 - Todas as melhorias solicitadas implementadas*
+*Atualizado em 30/03/2026*
