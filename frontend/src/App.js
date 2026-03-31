@@ -2736,6 +2736,7 @@ const EditProfilePage = () => {
     bio: '',
     address: '',
     website: '',
+    instagram: '',
     store_name: ''
   });
   const fileInputRef = useRef(null);
@@ -2757,6 +2758,7 @@ const EditProfilePage = () => {
         bio: res.data.bio || '',
         address: res.data.address || '',
         website: res.data.website || '',
+        instagram: res.data.instagram || '',
         store_name: res.data.store_name || ''
       });
     } catch (error) {
@@ -2917,6 +2919,19 @@ const EditProfilePage = () => {
                   placeholder="https://www.seusite.com.br"
                   className="mt-1"
                 />
+              </div>
+
+              <div>
+                <Label>Instagram</Label>
+                <Input
+                  value={profile.instagram}
+                  onChange={(e) => setProfile({...profile, instagram: e.target.value})}
+                  placeholder="Digite apenas o @ ou link completo. Ex: @tratorshop"
+                  className="mt-1"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  💡 Você pode digitar @usuario ou usuario, será convertido automaticamente
+                </p>
               </div>
 
               <div className="flex gap-3 pt-4">

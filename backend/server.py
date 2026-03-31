@@ -2395,13 +2395,15 @@ async def update_site_settings(data: SiteSettings, request: Request):
     """Update global site settings (admin only)"""
     admin = await require_admin(request)
     
+    # Convert to dict first
+    settings_data = data.model_dump(exclude_none=True)
+    
     # Normalize Instagram URLs in social_links
-    if data.social_links:
-        for link in data.social_links:
+    if settings_data.get('social_links'):
+        for link in settings_data['social_links']:
             if link.get('name', '').lower() == 'instagram':
                 link['url'] = normalize_instagram_url(link.get('url', ''))
     
-    settings_data = data.model_dump(exclude_none=True)
     settings_data['updated_at'] = datetime.now(timezone.utc).isoformat()
     settings_data['updated_by'] = admin['user_id']
     
