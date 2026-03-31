@@ -1294,6 +1294,8 @@ const ListingDetailPage = () => {
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
     const fetchListing = async () => {
@@ -1323,6 +1325,46 @@ const ListingDetailPage = () => {
     const message = encodeURIComponent(`Olá! Vi seu anúncio "${listing.title}" no TratorShop e tenho interesse.`);
     const phone = listing.whatsapp.replace(/\D/g, '');
     window.open(`https://wa.me/55${phone}?text=${message}`, '_blank');
+  };
+
+  const handleShare = async (type) => {
+    if (!listing) return;
+    
+    const shareUrl = window.location.href;
+    const shareTitle = listing.title;
+    const shareText = `Confira este anúncio no TratorShop:\n\n${listing.title}\n💰 ${formatPrice(listing.price)}\n📍 ${listing.city}, ${listing.state}\n\nVeja mais:`;
+    
+    if (type === 'native' && navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl
+        });
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('Error sharing:', error);
+        }
+      }
+    } else if (type === 'whatsapp') {
+      const message = encodeURIComponent(`${shareText}\n${shareUrl}`);
+      window.open(`https://wa.me/?text=${message}`, '_blank');
+    } else if (type === 'facebook') {
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+    } else if (type === 'copy') {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setLinkCopied(true);
+        toast.success("Link copiado com sucesso!");
+        setTimeout(() => {
+          setLinkCopied(false);
+          setShareModalOpen(false);
+        }, 1500);
+      } catch (error) {
+        console.error('Error copying:', error);
+        toast.error("Erro ao copiar link");
+      }
+    }
   };
 
   const formatPrice = (price) => {
@@ -1427,9 +1469,21 @@ const ListingDetailPage = () => {
             {/* Details */}
             <Card>
               <CardHeader>
-                <h1 className="text-2xl md:text-3xl font-bold text-slate-900" style={{ fontFamily: 'Outfit' }}>
-                  {listing.title}
-                </h1>
+                <div className="flex items-start justify-between gap-4">
+                  <h1 className="text-2xl md:text-3xl font-bold text-slate-900 flex-1" style={{ fontFamily: 'Outfit' }}>
+                    {listing.title}
+                  </h1>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShareModalOpen(true)}
+                    className="flex items-center gap-2 whitespace-nowrap"
+                    data-testid="share-listing-button"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">Compartilhar</span>
+                  </Button>
+                </div>
                 <div className="flex items-center gap-4 text-slate-500">
                   <span className="flex items-center gap-1">
                     <MapPin className="w-4 h-4" />
@@ -1542,6 +1596,77 @@ const ListingDetailPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Share Modal */}
+      <Dialog open={shareModalOpen} onOpenChange={setShareModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="w-5 h-5 text-[#1A4D2E]" />
+              Compartilhar Anúncio
+            </DialogTitle>
+            <DialogDescription>
+              Compartilhe este anúncio com outras pessoas
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3 py-4">
+            {/* Native Share (Mobile) */}
+            {navigator.share && (
+              <Button
+                onClick={() => handleShare('native')}
+                className="w-full justify-start bg-slate-100 hover:bg-slate-200 text-slate-900"
+                variant="outline"
+              >
+                <Share2 className="w-5 h-5 mr-3" />
+                Compartilhar via...
+              </Button>
+            )}
+            
+            {/* WhatsApp */}
+            <Button
+              onClick={() => handleShare('whatsapp')}
+              className="w-full justify-start bg-[#25D366] hover:bg-[#1ebd59] text-white"
+            >
+              <MessageCircle className="w-5 h-5 mr-3" />
+              Compartilhar no WhatsApp
+            </Button>
+            
+            {/* Facebook */}
+            <Button
+              onClick={() => handleShare('facebook')}
+              className="w-full justify-start bg-[#1877F2] hover:bg-[#0c63d4] text-white"
+            >
+              <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              </svg>
+              Compartilhar no Facebook
+            </Button>
+            
+            {/* Copy Link */}
+            <Button
+              onClick={() => handleShare('copy')}
+              className="w-full justify-start bg-slate-100 hover:bg-slate-200 text-slate-900"
+              variant="outline"
+              disabled={linkCopied}
+            >
+              {linkCopied ? (
+                <>
+                  <Check className="w-5 h-5 mr-3 text-green-600" />
+                  Link copiado!
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Copiar link
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
