@@ -3226,6 +3226,14 @@ const AdminPage = () => {
   });
   const [creatingUser, setCreatingUser] = useState(false);
 
+  // Advanced Edit User Modal
+  const [showAdvancedEditModal, setShowAdvancedEditModal] = useState(false);
+  const [advancedEditUser, setAdvancedEditUser] = useState(null);
+  const [advancedEditData, setAdvancedEditData] = useState({});
+  const [advancedEditTab, setAdvancedEditTab] = useState('account');
+  const [tempPassword, setTempPassword] = useState('');
+  const [savingAdvancedEdit, setSavingAdvancedEdit] = useState(false);
+
   useEffect(() => {
     if (!admin) {
       navigate('/admin-login');
@@ -3619,6 +3627,71 @@ const AdminPage = () => {
     } finally {
       setLoadingUserListings(false);
     }
+  };
+
+  const handleAdvancedEditSave = async (e) => {
+    e?.preventDefault();
+    setSavingAdvancedEdit(true);
+    try {
+      await axios.put(
+        `${API}/admin/users/${advancedEditUser.user_id}`,
+        advancedEditData,
+        { withCredentials: true }
+      );
+      toast.success("Usuário atualizado com sucesso!");
+      setShowAdvancedEditModal(false);
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Erro ao atualizar usuário");
+    } finally {
+      setSavingAdvancedEdit(false);
+    }
+  };
+
+  const handleGenerateTempPassword = async () => {
+    try {
+      const res = await axios.post(
+        `${API}/admin/users/${advancedEditUser.user_id}/generate-temp-password`,
+        {},
+        { withCredentials: true }
+      );
+      setTempPassword(res.data.temp_password);
+      toast.success("Senha temporária gerada!");
+    } catch (error) {
+      toast.error("Erro ao gerar senha temporária");
+    }
+  };
+
+  const handleResetPassword = async (password, forceChange) => {
+    try {
+      await axios.post(
+        `${API}/admin/users/${advancedEditUser.user_id}/reset-password`,
+        { new_password: password, force_change: forceChange },
+        { withCredentials: true }
+      );
+      toast.success(forceChange ? "Senha redefinida! Usuário será obrigado a trocar no próximo login." : "Senha redefinida!");
+    } catch (error) {
+      toast.error("Erro ao redefinir senha");
+    }
+  };
+
+  const handleAddSocialLink = () => {
+    setAdvancedEditData({
+      ...advancedEditData,
+      social_links: [...(advancedEditData.social_links || []), { name: '', url: '' }]
+    });
+  };
+
+  const handleRemoveSocialLink = (index) => {
+    const newLinks = [...advancedEditData.social_links];
+    newLinks.splice(index, 1);
+    setAdvancedEditData({ ...advancedEditData, social_links: newLinks });
+  };
+
+  const handleUpdateSocialLink = (index, field, value) => {
+    const newLinks = [...advancedEditData.social_links];
+    newLinks[index][field] = value;
+    setAdvancedEditData({ ...advancedEditData, social_links: newLinks });
   };
 
   const handleLogout = async () => {
@@ -4296,6 +4369,39 @@ const AdminPage = () => {
                         <span className="text-xs text-slate-500 hidden sm:block">
                           {new Date(user.created_at).toLocaleDateString('pt-BR')}
                         </span>
+                        {/* Edit User (Complete) */}
+                        <Button 
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setAdvancedEditUser(user);
+                            setAdvancedEditData({
+                              name: user.name || '',
+                              email: user.email || '',
+                              phone: user.phone || '',
+                              store_name: user.store_name || '',
+                              username: user.username || '',
+                              status: user.status || 'active',
+                              role: user.role || 'user',
+                              bio: user.bio || '',
+                              address: user.address || '',
+                              city: user.city || '',
+                              website: user.website || '',
+                              plan_type: user.plan_type || '',
+                              plan_expires_at: user.plan_expires_at || '',
+                              plan_status: user.plan_status || 'active',
+                              max_listings: user.max_listings || 3,
+                              social_links: user.social_links || []
+                            });
+                            setAdvancedEditTab('account');
+                            setShowAdvancedEditModal(true);
+                          }}
+                          className="text-blue-400 border-blue-600 hover:bg-blue-900/30"
+                          data-testid={`edit-user-${user.user_id}`}
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Editar
+                        </Button>
                         {/* View User Listings */}
                         <Button 
                           size="sm"
@@ -5011,6 +5117,306 @@ const AdminPage = () => {
                 </Button>
               </div>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Advanced Edit User Modal */}
+        <Dialog open={showAdvancedEditModal} onOpenChange={setShowAdvancedEditModal}>
+          <DialogContent className="bg-slate-800 border-slate-700 max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-white">Editar Usuário Completo</DialogTitle>
+              <DialogDescription className="text-slate-400">
+                {advancedEditUser?.name} • {advancedEditUser?.email}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Tabs value={advancedEditTab} onValueChange={setAdvancedEditTab} className="mt-4">
+              <TabsList className="grid w-full grid-cols-5 bg-slate-700">
+                <TabsTrigger value="account" className="text-xs">Conta</TabsTrigger>
+                <TabsTrigger value="credentials" className="text-xs">Senha</TabsTrigger>
+                <TabsTrigger value="plan" className="text-xs">Plano</TabsTrigger>
+                <TabsTrigger value="social" className="text-xs">Redes</TabsTrigger>
+                <TabsTrigger value="contact" className="text-xs">Contato</TabsTrigger>
+              </TabsList>
+
+              {/* Account Tab */}
+              <TabsContent value="account" className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-slate-300">Nome *</Label>
+                    <Input
+                      value={advancedEditData.name || ''}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, name: e.target.value})}
+                      className="mt-1 bg-slate-700 border-slate-600 text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Email *</Label>
+                    <Input
+                      type="email"
+                      value={advancedEditData.email || ''}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, email: e.target.value})}
+                      className="mt-1 bg-slate-700 border-slate-600 text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Nome da Loja</Label>
+                    <Input
+                      value={advancedEditData.store_name || ''}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, store_name: e.target.value})}
+                      className="mt-1 bg-slate-700 border-slate-600 text-white"
+                      placeholder="Para dealers"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Username (slug público)</Label>
+                    <Input
+                      value={advancedEditData.username || ''}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, username: e.target.value})}
+                      className="mt-1 bg-slate-700 border-slate-600 text-white"
+                      placeholder="ex: joao-silva"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Tipo de Conta</Label>
+                    <select
+                      value={advancedEditData.role || 'user'}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, role: e.target.value})}
+                      className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
+                    >
+                      <option value="user">Individual</option>
+                      <option value="dealer">Dealer</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Status</Label>
+                    <select
+                      value={advancedEditData.status || 'active'}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, status: e.target.value})}
+                      className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
+                    >
+                      <option value="active">Ativo</option>
+                      <option value="pending_approval">Pendente</option>
+                      <option value="blocked">Bloqueado</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-slate-300">Bio</Label>
+                    <Textarea
+                      value={advancedEditData.bio || ''}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, bio: e.target.value})}
+                      className="mt-1 bg-slate-700 border-slate-600 text-white"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Credentials Tab */}
+              <TabsContent value="credentials" className="space-y-4 mt-4">
+                <div className="bg-amber-900/20 border border-amber-700 rounded-lg p-4 mb-4">
+                  <p className="text-amber-400 text-sm mb-2">⚠️ Gerenciamento de Senha</p>
+                  <p className="text-slate-400 text-xs">Por segurança, a senha atual não é exibida. Você pode gerar uma senha temporária ou forçar troca no próximo login.</p>
+                </div>
+                
+                <div className="space-y-3">
+                  <Button
+                    type="button"
+                    onClick={handleGenerateTempPassword}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                  >
+                    Gerar Senha Temporária
+                  </Button>
+                  
+                  {tempPassword && (
+                    <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
+                      <Label className="text-green-400 text-sm">Senha Temporária Gerada:</Label>
+                      <div className="flex items-center gap-2 mt-2">
+                        <code className="bg-slate-900 text-green-300 px-3 py-2 rounded font-mono text-lg flex-1">
+                          {tempPassword}
+                        </code>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(tempPassword);
+                            toast.success("Senha copiada!");
+                          }}
+                        >
+                          Copiar
+                        </Button>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-2">
+                        ⚠️ Esta senha será exibida apenas uma vez. Envie ao usuário de forma segura.
+                      </p>
+                      <p className="text-xs text-amber-400 mt-1">
+                        O usuário será obrigado a trocar a senha no próximo login.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* Plan Tab */}
+              <TabsContent value="plan" className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-slate-300">Tipo de Plano</Label>
+                    <select
+                      value={advancedEditData.plan_type || ''}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, plan_type: e.target.value})}
+                      className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
+                    >
+                      <option value="">Nenhum</option>
+                      <option value="anuncio_unico">Anúncio Único</option>
+                      <option value="lojista">Lojista</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Status do Plano</Label>
+                    <select
+                      value={advancedEditData.plan_status || 'active'}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, plan_status: e.target.value})}
+                      className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
+                    >
+                      <option value="active">Ativo</option>
+                      <option value="expired">Expirado</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Limite de Anúncios</Label>
+                    <Input
+                      type="number"
+                      value={advancedEditData.max_listings || 3}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, max_listings: parseInt(e.target.value)})}
+                      className="mt-1 bg-slate-700 border-slate-600 text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Data de Expiração</Label>
+                    <Input
+                      type="date"
+                      value={advancedEditData.plan_expires_at ? advancedEditData.plan_expires_at.split('T')[0] : ''}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, plan_expires_at: e.target.value})}
+                      className="mt-1 bg-slate-700 border-slate-600 text-white"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Social Tab */}
+              <TabsContent value="social" className="space-y-4 mt-4">
+                <div className="flex items-center justify-between mb-4">
+                  <Label className="text-slate-300">Redes Sociais</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleAddSocialLink}
+                    className="bg-[#1A4D2E] hover:bg-[#143d24]"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Adicionar
+                  </Button>
+                </div>
+                
+                <div className="space-y-3">
+                  {(advancedEditData.social_links || []).map((link, index) => (
+                    <div key={index} className="flex items-center gap-2 p-3 bg-slate-700 rounded-lg">
+                      <Input
+                        placeholder="Nome (ex: Instagram)"
+                        value={link.name}
+                        onChange={(e) => handleUpdateSocialLink(index, 'name', e.target.value)}
+                        className="bg-slate-600 border-slate-500 text-white"
+                      />
+                      <Input
+                        placeholder="URL completa"
+                        value={link.url}
+                        onChange={(e) => handleUpdateSocialLink(index, 'url', e.target.value)}
+                        className="flex-1 bg-slate-600 border-slate-500 text-white"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRemoveSocialLink(index)}
+                        className="text-red-400 border-red-700 hover:bg-red-900/50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  {(!advancedEditData.social_links || advancedEditData.social_links.length === 0) && (
+                    <div className="text-center py-8 text-slate-400">
+                      <p>Nenhuma rede social adicionada</p>
+                      <p className="text-xs mt-1">Clique em "Adicionar" para incluir</p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* Contact Tab */}
+              <TabsContent value="contact" className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-slate-300">Telefone/WhatsApp</Label>
+                    <Input
+                      value={advancedEditData.phone || ''}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, phone: e.target.value})}
+                      className="mt-1 bg-slate-700 border-slate-600 text-white"
+                      placeholder="(67) 99999-9999"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Cidade</Label>
+                    <Input
+                      value={advancedEditData.city || ''}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, city: e.target.value})}
+                      className="mt-1 bg-slate-700 border-slate-600 text-white"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-slate-300">Endereço Completo</Label>
+                    <Input
+                      value={advancedEditData.address || ''}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, address: e.target.value})}
+                      className="mt-1 bg-slate-700 border-slate-600 text-white"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-slate-300">Website</Label>
+                    <Input
+                      value={advancedEditData.website || ''}
+                      onChange={(e) => setAdvancedEditData({...advancedEditData, website: e.target.value})}
+                      className="mt-1 bg-slate-700 border-slate-600 text-white"
+                      placeholder="https://exemplo.com.br"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            {/* Footer Actions */}
+            <div className="flex gap-3 pt-4 border-t border-slate-700 mt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setShowAdvancedEditModal(false)}
+                className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                type="button"
+                onClick={handleAdvancedEditSave}
+                disabled={savingAdvancedEdit}
+                className="flex-1 bg-[#1A4D2E] hover:bg-[#143d24]"
+              >
+                {savingAdvancedEdit ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Salvar Alterações
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
