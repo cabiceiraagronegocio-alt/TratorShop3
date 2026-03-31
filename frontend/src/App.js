@@ -5477,6 +5477,9 @@ const SellerProfilePage = () => {
   const [seller, setSeller] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredListings, setFilteredListings] = useState([]);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     const fetchSeller = async () => {
@@ -5484,6 +5487,7 @@ const SellerProfilePage = () => {
       try {
         const res = await axios.get(`${API}/vendedor/${userId}`);
         setSeller(res.data);
+        setFilteredListings(res.data.listings || []);
       } catch (error) {
         console.error("Error fetching seller:", error);
         setSeller(null);
@@ -5493,6 +5497,32 @@ const SellerProfilePage = () => {
     };
     fetchSeller();
   }, [userId]);
+
+  // Debounced search function
+  useEffect(() => {
+    if (!seller) return;
+
+    const delaySearch = setTimeout(async () => {
+      if (!searchQuery.trim()) {
+        setFilteredListings(seller.listings || []);
+        setSearching(false);
+        return;
+      }
+
+      setSearching(true);
+      try {
+        const res = await axios.get(`${API}/users/${userId}/listings?search=${encodeURIComponent(searchQuery)}`);
+        setFilteredListings(res.data.listings || []);
+      } catch (error) {
+        console.error("Error searching listings:", error);
+        setFilteredListings([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 350); // 350ms debounce
+
+    return () => clearTimeout(delaySearch);
+  }, [searchQuery, userId, seller]);
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -5618,15 +5648,41 @@ const SellerProfilePage = () => {
 
       {/* Listings */}
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
-        <h2 className="text-xl font-semibold text-slate-900 mb-6" style={{ fontFamily: 'Outfit' }}>
-          Anúncios ({seller.total_listings})
-        </h2>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <h2 className="text-xl font-semibold text-slate-900" style={{ fontFamily: 'Outfit' }}>
+            Anúncios ({seller.total_listings})
+          </h2>
+          
+          {/* Search Bar */}
+          {seller.total_listings > 0 && (
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Input
+                type="text"
+                placeholder="Buscar anúncios deste vendedor..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-2 w-full border-slate-200 focus:border-[#1A4D2E] focus:ring-[#1A4D2E]"
+                data-testid="seller-search-input"
+              />
+              {searching && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-[#1A4D2E]" />
+              )}
+            </div>
+          )}
+        </div>
         
-        {seller.listings?.length > 0 ? (
+        {filteredListings.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {seller.listings.map(listing => (
+            {filteredListings.map(listing => (
               <ListingCard key={listing.listing_id} listing={listing} />
             ))}
+          </div>
+        ) : searchQuery.trim() ? (
+          <div className="text-center py-16">
+            <Search className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Nenhum anúncio encontrado</h3>
+            <p className="text-slate-500">Tente buscar por outro termo</p>
           </div>
         ) : (
           <div className="text-center py-16">
