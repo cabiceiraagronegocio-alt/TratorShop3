@@ -1,0 +1,49 @@
+nohup: ignoring input
+INFO:     Started server process [17730]
+INFO:     Waiting for application startup.
+2026-03-31 02:33:09,074 - root - WARNING - EMERGENT_LLM_KEY not set - file uploads disabled
+2026-03-31 02:33:09,075 - server - INFO - Storage initialized
+ERROR:    Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/dist-packages/starlette/routing.py", line 732, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+  File "/usr/local/lib/python3.11/dist-packages/starlette/routing.py", line 608, in __aenter__
+    await self._router.startup()
+  File "/usr/local/lib/python3.11/dist-packages/starlette/routing.py", line 709, in startup
+    await handler()
+  File "/home/ubuntu/TratorShop3/backend/server.py", line 2349, in startup
+    await db.listings.create_index([("status", 1), ("is_featured", -1), ("created_at", -1)])
+  File "/usr/lib/python3.11/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/pymongo/collection.py", line 2138, in create_index
+    return self.__create_indexes([index], session, **cmd_options)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/pymongo/_csot.py", line 108, in csot_wrapper
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/pymongo/collection.py", line 1990, in __create_indexes
+    with self._conn_for_writes(session) as conn:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/pymongo/collection.py", line 265, in _conn_for_writes
+    return self.__database.client._conn_for_writes(session)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/pymongo/mongo_client.py", line 1307, in _conn_for_writes
+    server = self._select_server(writable_server_selector, session)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/pymongo/mongo_client.py", line 1297, in _select_server
+    server = topology.select_server(server_selector)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/pymongo/topology.py", line 312, in select_server
+    server = self._select_server(selector, server_selection_timeout, address)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/pymongo/topology.py", line 296, in _select_server
+    servers = self.select_servers(selector, server_selection_timeout, address)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/pymongo/topology.py", line 247, in select_servers
+    server_descriptions = self._select_servers_loop(selector, server_timeout, address)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/pymongo/topology.py", line 269, in _select_servers_loop
+    raise ServerSelectionTimeoutError(
+pymongo.errors.ServerSelectionTimeoutError: localhost:27017: [Errno 111] Connection refused, Timeout: 30s, Topology Description: <TopologyDescription id: 69cb6aa495c239e6caaee52e, topology_type: Unknown, servers: [<ServerDescription ('localhost', 27017) server_type: Unknown, rtt: None, error=AutoReconnect('localhost:27017: [Errno 111] Connection refused')>]>
+
+ERROR:    Application startup failed. Exiting.

@@ -1,0 +1,25 @@
+services:
+  # Backend (FastAPI)
+  - type: web
+    name: tratorshop-backend
+    env: python
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: cd backend && uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGO_URL
+        sync: false # Você deverá configurar isso no painel da Render
+      - key: DB_NAME
+        value: tratorshop
+
+  # Frontend (React)
+  - type: web
+    name: tratorshop-frontend
+    env: node
+    buildCommand: cd frontend && yarn install && yarn build
+    startCommand: cd frontend && serve -s build
+    envVars:
+      - key: REACT_APP_BACKEND_URL
+        fromService:
+          name: tratorshop-backend
+          type: web
+          property: host

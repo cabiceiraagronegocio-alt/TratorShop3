@@ -47,11 +47,10 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// Cache bust: v2 - force new URL
-// Use localhost:8001 for local development, otherwise use env variable
+// API Configuration for local development and production (Render)
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const BACKEND_URL = isLocalhost ? 'http://localhost:8001' : (process.env.REACT_APP_BACKEND_URL || window.location.origin);
-const API = `${BACKEND_URL}/api`;
+const BACKEND_URL = isLocalhost ? 'http://localhost:8000' : (process.env.REACT_APP_BACKEND_URL || '');
+const API = BACKEND_URL ? `${BACKEND_URL}/api` : '/api';
 
 // Admin Auth Context
 const AdminAuthContext = createContext(null);
@@ -2610,7 +2609,7 @@ const EditProfilePage = () => {
     phone: '',
     bio: '',
     address: '',
-    website: '',
+    instagram: '',
     store_name: ''
   });
   const fileInputRef = useRef(null);
@@ -2631,7 +2630,7 @@ const EditProfilePage = () => {
         phone: res.data.phone || '',
         bio: res.data.bio || '',
         address: res.data.address || '',
-        website: res.data.website || '',
+        instagram: res.data.instagram || '',
         store_name: res.data.store_name || ''
       });
     } catch (error) {
@@ -2784,15 +2783,18 @@ const EditProfilePage = () => {
                 />
               </div>
 
-              <div>
-                <Label>Website / Redes Sociais</Label>
-                <Input
-                  value={profile.website}
-                  onChange={(e) => setProfile({...profile, website: e.target.value})}
-                  placeholder="https://www.seusite.com.br"
-                  className="mt-1"
-                />
-              </div>
+	              <div>
+	                <Label>Instagram</Label>
+	                <Input
+	                  value={profile.instagram}
+	                  onChange={(e) => setProfile({...profile, instagram: e.target.value})}
+	                  placeholder="Digite seu @ ou link. Ex: @tratorshop"
+	                  className="mt-1"
+	                />
+	                <p className="text-xs text-slate-500 mt-1">
+	                  Você pode digitar @usuario ou apenas o nome de usuário.
+	                </p>
+	              </div>
 
               <div className="flex gap-3 pt-4">
                 <Button
@@ -5581,17 +5583,17 @@ const SellerProfilePage = () => {
                   {seller.address}
                 </p>
               )}
-              {seller.website && (
-                <a 
-                  href={seller.website.startsWith('http') ? seller.website : `https://${seller.website}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[#F9C02D] text-sm flex items-center justify-center md:justify-start gap-1 hover:underline mt-1"
-                >
-                  <Globe className="w-4 h-4" />
-                  {seller.website.replace(/^https?:\/\//, '')}
-                </a>
-              )}
+	              {seller.instagram && (
+	                <a 
+	                  href={seller.instagram.startsWith('http') ? seller.instagram : `https://www.instagram.com/${seller.instagram.replace('@', '')}`}
+	                  target="_blank"
+	                  rel="noopener noreferrer"
+	                  className="text-[#F9C02D] text-sm flex items-center justify-center md:justify-start gap-1 hover:underline mt-1"
+	                >
+	                  <Instagram className="w-4 h-4" />
+	                  {seller.instagram.startsWith('@') ? seller.instagram : `@${seller.instagram}`}
+	                </a>
+	              )}
             </div>
             <div className="flex gap-3">
               {seller.phone && (

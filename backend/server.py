@@ -18,9 +18,9 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/tratorshop')
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[os.environ.get('DB_NAME', 'tratorshop')]
 
 # Object Storage Configuration
 STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
@@ -73,6 +73,15 @@ def get_object(path: str) -> tuple:
 # Create the main app
 app = FastAPI(title="TratorShop API", description="Agricultural Machinery Marketplace")
 
+# CORS Configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Em produção, podemos restringir para o domínio oficial
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Create router with /api prefix
 api_router = APIRouter(prefix="/api")
 
@@ -100,7 +109,7 @@ class UserBase(BaseModel):
     phone: Optional[str] = None
     bio: Optional[str] = None
     address: Optional[str] = None
-    website: Optional[str] = None
+    instagram: Optional[str] = None
     store_name: Optional[str] = None
     # Plan fields
     plan_type: Optional[str] = None  # "anuncio_unico" or "lojista"
@@ -247,6 +256,7 @@ class UserProfileUpdate(BaseModel):
     phone: Optional[str] = None
     bio: Optional[str] = None
     address: Optional[str] = None
+    instagram: Optional[str] = None
     store_name: Optional[str] = None
 
 # Plan Selection Model
@@ -616,7 +626,7 @@ class ProfileUpdate(BaseModel):
     phone: Optional[str] = None
     bio: Optional[str] = None
     address: Optional[str] = None
-    website: Optional[str] = None
+    instagram: Optional[str] = None
 
 @api_router.put("/user/profile")
 async def update_profile(profile: ProfileUpdate, request: Request):
@@ -632,8 +642,12 @@ async def update_profile(profile: ProfileUpdate, request: Request):
         update_data["bio"] = profile.bio
     if profile.address is not None:
         update_data["address"] = profile.address
-    if profile.website is not None:
-        update_data["website"] = profile.website
+    if profile.instagram is not None:
+        # Clean instagram handle (remove @ if present)
+        insta = profile.instagram.strip()
+        if insta.startswith('@'):
+            insta = insta[1:]
+        update_data["instagram"] = insta
     
     if update_data:
         await db.users.update_one(
@@ -708,7 +722,7 @@ async def get_public_profile(user_id: str):
         "picture": user.get("picture"),
         "bio": user.get("bio", ""),
         "address": user.get("address", ""),
-        "website": user.get("website", ""),
+        "instagram": user.get("instagram", ""),
         "phone": user.get("phone", ""),
         "role": user.get("role", "user"),
         "dealer_profile": user.get("dealer_profile") if user.get("role") == "dealer" else None,
@@ -797,6 +811,12 @@ async def update_user_profile(data: UserProfileUpdate, request: Request):
         update_data["bio"] = data.bio
     if data.address is not None:
         update_data["address"] = data.address
+    if data.instagram is not None:
+        # Clean instagram handle
+        insta = data.instagram.strip()
+        if insta.startswith('@'):
+            insta = insta[1:]
+        update_data["instagram"] = insta
     if data.store_name is not None:
         update_data["store_name"] = data.store_name
     
