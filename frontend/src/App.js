@@ -2146,9 +2146,7 @@ const OnboardingPage = () => {
                 </div>
                 <div className="pt-4 border-t">
                   <p className="text-3xl font-bold text-[#1A4D2E]">R$ 149</p>
-                  <p className="text-sm text-slate-500">
-                    trimestral | 1ª parcela: <span className="text-green-600 font-bold">R$ 97</span>
-                  </p>
+                  <p className="text-sm text-slate-500">trimestral</p>
                 </div>
               </button>
             </div>
@@ -3075,6 +3073,15 @@ const AdminPage = () => {
   const [editingDealer, setEditingDealer] = useState(null);
   const [newLimit, setNewLimit] = useState('');
 
+  // Edit User Full Modal (Admin)
+  const [showEditUserFullModal, setShowEditUserFullModal] = useState(false);
+  const [editingUserFull, setEditingUserFull] = useState(null);
+  const [editUserFullData, setEditUserFullData] = useState({
+    name: '', email: '', password: '', phone: '', role: '', 
+    max_listings: '', status: '', bio: '', address: '', 
+    website: '', instagram: '', facebook: ''
+  });
+
   // Edit User Modal
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -3199,6 +3206,60 @@ const AdminPage = () => {
       fetchStats();
     } catch (error) {
       toast.error("Erro ao aprovar");
+    }
+  };
+
+  // Abrir modal de edição completa de usuário
+  const handleOpenEditUserFull = (user) => {
+    setEditingUserFull(user);
+    setEditUserFullData({
+      name: user.name || '',
+      email: user.email || '',
+      password: '', // Não preenchemos a senha atual
+      phone: user.phone || '',
+      role: user.role || 'user',
+      max_listings: user.role === 'dealer' 
+        ? (user.dealer_profile?.max_listings || 20).toString()
+        : (user.max_listings || 3).toString(),
+      status: user.status || 'pending_approval',
+      bio: user.bio || '',
+      address: user.address || '',
+      website: user.website || '',
+      instagram: user.instagram || '',
+      facebook: user.facebook || ''
+    });
+    setShowEditUserFullModal(true);
+  };
+
+  // Salvar edição completa de usuário
+  const handleSaveUserFull = async (e) => {
+    e.preventDefault();
+    if (!editingUserFull) return;
+    
+    try {
+      const updateData = {};
+      if (editUserFullData.name) updateData.name = editUserFullData.name;
+      if (editUserFullData.email) updateData.email = editUserFullData.email;
+      if (editUserFullData.password) updateData.password = editUserFullData.password;
+      if (editUserFullData.phone) updateData.phone = editUserFullData.phone;
+      if (editUserFullData.role) updateData.role = editUserFullData.role;
+      if (editUserFullData.max_listings) updateData.max_listings = parseInt(editUserFullData.max_listings);
+      if (editUserFullData.status) updateData.status = editUserFullData.status;
+      updateData.bio = editUserFullData.bio;
+      updateData.address = editUserFullData.address;
+      updateData.website = editUserFullData.website;
+      updateData.instagram = editUserFullData.instagram;
+      updateData.facebook = editUserFullData.facebook;
+      
+      await axios.put(`${API}/admin/users/${editingUserFull.user_id}`, updateData, { withCredentials: true });
+      toast.success("Usuário atualizado!");
+      setShowEditUserFullModal(false);
+      setEditingUserFull(null);
+      fetchUsers();
+      fetchPendingUsers();
+      fetchStats();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Erro ao atualizar usuário");
     }
   };
 
@@ -4182,6 +4243,17 @@ const AdminPage = () => {
                           <Package className="w-4 h-4 mr-1" />
                           Anúncios
                         </Button>
+                        {/* Edit User Full */}
+                        <Button 
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenEditUserFull(user)}
+                          className="text-blue-400 border-blue-700 hover:bg-blue-900/50"
+                          data-testid={`edit-user-full-${user.user_id}`}
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Editar
+                        </Button>
                         {/* Edit Limit */}
                         {user.role !== 'dealer' && (
                           <Button 
@@ -4467,6 +4539,150 @@ const AdminPage = () => {
                 >
                   {promotingUser ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Store className="w-4 h-4 mr-2" />}
                   Promover
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit User Full Modal (Admin) */}
+        <Dialog open={showEditUserFullModal} onOpenChange={setShowEditUserFullModal}>
+          <DialogContent className="bg-slate-800 border-slate-700 max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-white">Editar Usuário Completo</DialogTitle>
+              <DialogDescription className="text-slate-400">
+                {editingUserFull?.email}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSaveUserFull} className="space-y-4 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-slate-300">Nome</Label>
+                  <Input
+                    value={editUserFullData.name}
+                    onChange={(e) => setEditUserFullData({...editUserFullData, name: e.target.value})}
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Email</Label>
+                  <Input
+                    type="email"
+                    value={editUserFullData.email}
+                    onChange={(e) => setEditUserFullData({...editUserFullData, email: e.target.value})}
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Nova Senha (deixe vazio para manter)</Label>
+                  <Input
+                    type="password"
+                    value={editUserFullData.password}
+                    onChange={(e) => setEditUserFullData({...editUserFullData, password: e.target.value})}
+                    placeholder="••••••••"
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">WhatsApp</Label>
+                  <Input
+                    value={editUserFullData.phone}
+                    onChange={(e) => setEditUserFullData({...editUserFullData, phone: e.target.value})}
+                    placeholder="(67) 99999-9999"
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Tipo de Conta</Label>
+                  <select
+                    value={editUserFullData.role}
+                    onChange={(e) => setEditUserFullData({...editUserFullData, role: e.target.value})}
+                    className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
+                  >
+                    <option value="user">Individual</option>
+                    <option value="dealer">Lojista (Dealer)</option>
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-slate-300">Limite de Anúncios</Label>
+                  <Input
+                    type="number"
+                    value={editUserFullData.max_listings}
+                    onChange={(e) => setEditUserFullData({...editUserFullData, max_listings: e.target.value})}
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Status</Label>
+                  <select
+                    value={editUserFullData.status}
+                    onChange={(e) => setEditUserFullData({...editUserFullData, status: e.target.value})}
+                    className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
+                  >
+                    <option value="pending_approval">Pendente</option>
+                    <option value="active">Ativo</option>
+                    <option value="rejected">Rejeitado</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <Label className="text-slate-300">Biografia</Label>
+                  <textarea
+                    value={editUserFullData.bio}
+                    onChange={(e) => setEditUserFullData({...editUserFullData, bio: e.target.value})}
+                    rows={2}
+                    className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label className="text-slate-300">Endereço Completo</Label>
+                  <Input
+                    value={editUserFullData.address}
+                    onChange={(e) => setEditUserFullData({...editUserFullData, address: e.target.value})}
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Website</Label>
+                  <Input
+                    value={editUserFullData.website}
+                    onChange={(e) => setEditUserFullData({...editUserFullData, website: e.target.value})}
+                    placeholder="https://..."
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Instagram</Label>
+                  <Input
+                    value={editUserFullData.instagram}
+                    onChange={(e) => setEditUserFullData({...editUserFullData, instagram: e.target.value})}
+                    placeholder="@usuario ou URL"
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Facebook</Label>
+                  <Input
+                    value={editUserFullData.facebook}
+                    onChange={(e) => setEditUserFullData({...editUserFullData, facebook: e.target.value})}
+                    placeholder="@pagina ou URL"
+                    className="mt-1 bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowEditUserFullModal(false)}
+                  className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit"
+                  className="flex-1 bg-[#1A4D2E] hover:bg-[#143d24]"
+                >
+                  Salvar Alterações
                 </Button>
               </div>
             </form>
@@ -4901,6 +5117,7 @@ const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -4952,11 +5169,18 @@ const LoginPage = () => {
       setError('Nome é obrigatório');
       return;
     }
+
+    // Validar WhatsApp
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length < 10 || phoneDigits.length > 13) {
+      setError('Informe um WhatsApp válido para continuar');
+      return;
+    }
     
     setLoading(true);
 
     try {
-      await axios.post(`${API}/auth/register`, { email, password, name });
+      await axios.post(`${API}/auth/register`, { email, password, name, phone });
       toast.success('Cadastro realizado! Fazendo login...');
       
       // Auto login after register
@@ -5007,6 +5231,23 @@ const LoginPage = () => {
                   className="mt-1"
                   data-testid="register-name-input"
                 />
+              </div>
+            )}
+
+            {!isLogin && (
+              <div>
+                <Label htmlFor="phone">WhatsApp *</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(67) 99999-9999"
+                  className="mt-1"
+                  data-testid="register-phone-input"
+                  required
+                />
+                <p className="text-xs text-slate-500 mt-1">Obrigatório para contato</p>
               </div>
             )}
             

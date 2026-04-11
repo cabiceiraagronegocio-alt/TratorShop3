@@ -101,6 +101,8 @@ class UserBase(BaseModel):
     bio: Optional[str] = None
     address: Optional[str] = None
     website: Optional[str] = None
+    instagram: Optional[str] = None
+    facebook: Optional[str] = None
     store_name: Optional[str] = None
     # Plan fields
     plan_type: Optional[str] = None  # "anuncio_unico" or "lojista"
@@ -181,6 +183,7 @@ class UserRegister(BaseModel):
     email: str
     password: str
     name: str
+    phone: str  # WhatsApp obrigatório
 
 class UserLogin(BaseModel):
     email: str
@@ -492,6 +495,12 @@ async def register_user(data: UserRegister):
     if not re.match(email_regex, data.email):
         raise HTTPException(status_code=400, detail="Email inválido")
     
+    # Validate phone (WhatsApp) - obrigatório
+    phone = data.phone.strip() if data.phone else ""
+    phone_digits = re.sub(r'\D', '', phone)
+    if len(phone_digits) < 10 or len(phone_digits) > 13:
+        raise HTTPException(status_code=400, detail="Informe um WhatsApp válido para continuar")
+    
     # Check if email already exists
     existing = await db.users.find_one({"email": data.email.lower()})
     if existing:
@@ -503,7 +512,7 @@ async def register_user(data: UserRegister):
             password_hash = hash_password(data.password)
             await db.users.update_one(
                 {"email": data.email.lower()},
-                {"$set": {"password_hash": password_hash, "name": data.name}}
+                {"$set": {"password_hash": password_hash, "name": data.name, "phone": phone}}
             )
             user = await db.users.find_one({"email": data.email.lower()}, {"_id": 0, "password_hash": 0})
             return {"message": "Senha adicionada à conta existente", "user": user}
@@ -524,7 +533,7 @@ async def register_user(data: UserRegister):
         "is_admin": False,
         "role": "user",
         "status": "pending_approval",
-        "phone": None,
+        "phone": phone,
         "bio": None,
         "address": None,
         "store_name": None,
@@ -1458,6 +1467,91 @@ async def admin_set_user_limit(user_id: str, data: SetDealerLimit, request: Requ
         )
     
     return {"message": f"Limite atualizado para {data.max_listings} anúncios"}
+
+class AdminUserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None  # Will be hashed
+    phone: Optional[str] = None
+    role: Optional[str] = None  # "user" or "dealer"
+    max_listings: Optional[int] = None
+    status: Optional[str] = None  # "pending_approval", "active", "rejected"
+    bio: Optional[str] = None
+    address: Optional[str] = None
+    website: Optional[str] = None
+    instagram: Optional[str] = None
+    facebook: Optional[str] = None
+
+@api_router.put("/admin/users/{user_id}")
+async def admin_update_user(user_id: str, data: AdminUserUpdate, request: Request):
+    """Admin update user - full control"""
+    await require_admin(request)
+    
+    user = await db.users.find_one({"user_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    update_data = {}
+    
+    if data.name is not None:
+        update_data["name"] = data.name
+    if data.email is not None:
+        # Check if email is already taken by another user
+        existing = await db.users.find_one({"email": data.email.lower(), "user_id": {"$ne": user_id}})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email já está em uso")
+        update_data["email"] = data.email.lower()
+    if data.password is not None and data.password.strip():
+        # Hash the new password
+        update_data["password_hash"] = hash_password(data.password)
+    if data.phone is not None:
+        update_data["phone"] = data.phone
+    if data.role is not None:
+        update_data["role"] = data.role
+        if data.role == "dealer" and not user.get("dealer_profile"):
+            # Create dealer profile if promoting to dealer
+            update_data["dealer_profile"] = {
+                "store_name": user.get("name", ""),
+                "max_listings": 20
+            }
+    if data.max_listings is not None:
+        if user.get("role") == "dealer" or data.role == "dealer":
+            update_data["dealer_profile.max_listings"] = data.max_listings
+        else:
+            update_data["max_listings"] = data.max_listings
+    if data.status is not None:
+        update_data["status"] = data.status
+    if data.bio is not None:
+        update_data["bio"] = data.bio
+    if data.address is not None:
+        update_data["address"] = data.address
+    if data.website is not None:
+        update_data["website"] = data.website
+    if data.instagram is not None:
+        # Auto-convert @handle to full URL
+        ig = data.instagram.strip()
+        if ig.startswith("@"):
+            ig = f"https://instagram.com/{ig[1:]}"
+        elif ig and not ig.startswith("http"):
+            ig = f"https://instagram.com/{ig}"
+        update_data["instagram"] = ig
+    if data.facebook is not None:
+        # Auto-convert @handle to full URL
+        fb = data.facebook.strip()
+        if fb.startswith("@"):
+            fb = f"https://facebook.com/{fb[1:]}"
+        elif fb and not fb.startswith("http"):
+            fb = f"https://facebook.com/{fb}"
+        update_data["facebook"] = fb
+    
+    if update_data:
+        await db.users.update_one(
+            {"user_id": user_id},
+            {"$set": update_data}
+        )
+    
+    updated_user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+    return {"message": "Usuário atualizado", "user": updated_user}
 
 @api_router.put("/admin/listings/{listing_id}")
 async def admin_update_listing(listing_id: str, data: AdminUpdateListing, request: Request):
