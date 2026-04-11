@@ -1102,6 +1102,18 @@ const HomePage = () => {
         </div>
       </section>
 
+      {/* SEO Text Section */}
+      <section className="py-12 bg-slate-50">
+        <div className="max-w-4xl mx-auto px-4 md:px-8 text-center">
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-4" style={{ fontFamily: 'Outfit' }}>
+            Marketplace de máquinas agrícolas em Campo Grande MS e Mato Grosso do Sul
+          </h2>
+          <p className="text-slate-600 text-lg">
+            Encontre tratores usados, novos e implementos agrícolas na sua região.
+          </p>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-16 md:py-24 bg-[#1A4D2E]">
         <div className="max-w-4xl mx-auto px-4 md:px-8 text-center">
