@@ -1,5 +1,11 @@
 import { useEffect } from 'react';
 
+// Default SEO values with local focus on Campo Grande MS
+const DEFAULT_TITLE = 'TratorShop - Máquinas Agrícolas em Campo Grande MS | Comprar e Vender Tratores';
+const DEFAULT_DESCRIPTION = 'Encontre tratores, colheitadeiras e implementos agrícolas em Campo Grande MS e todo Mato Grosso do Sul. Anuncie grátis no TratorShop.';
+const DEFAULT_KEYWORDS = 'tratores Campo Grande, colheitadeiras MS, implementos agrícolas Mato Grosso do Sul, comprar trator Campo Grande, vender trator MS, máquinas agrícolas, agricultura MS';
+const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1758533696874-587c4e62940c?w=1200&h=630&fit=crop';
+
 // SEO Helper Component - Updates meta tags dynamically
 export const SEOHead = ({ 
   title, 
@@ -11,7 +17,7 @@ export const SEOHead = ({
 }) => {
   useEffect(() => {
     // Update document title
-    document.title = title ? `${title} | TratorShop` : 'TratorShop - Marketplace de Máquinas Agrícolas MS';
+    document.title = title ? `${title} | TratorShop` : DEFAULT_TITLE;
     
     // Helper to update or create meta tag
     const setMeta = (name, content, isProperty = false) => {
@@ -27,23 +33,29 @@ export const SEOHead = ({
     };
 
     // Basic meta tags
-    setMeta('description', description || 'O maior marketplace de tratores, colheitadeiras e implementos agrícolas do Mato Grosso do Sul. Compre e venda máquinas agrícolas.');
-    setMeta('keywords', keywords || 'tratores, colheitadeiras, implementos, máquinas agrícolas, agricultura, Mato Grosso do Sul, MS, comprar trator, vender trator');
+    setMeta('description', description || DEFAULT_DESCRIPTION);
+    setMeta('keywords', keywords || DEFAULT_KEYWORDS);
+    
+    // Geo tags for local SEO
+    setMeta('geo.region', 'BR-MS');
+    setMeta('geo.placename', 'Campo Grande');
+    setMeta('geo.position', '-20.4697;-54.6201');
+    setMeta('ICBM', '-20.4697, -54.6201');
     
     // Open Graph tags
-    setMeta('og:title', title || 'TratorShop - Marketplace de Máquinas Agrícolas', true);
-    setMeta('og:description', description || 'Compre e venda tratores, colheitadeiras e implementos no MS', true);
+    setMeta('og:title', title || DEFAULT_TITLE, true);
+    setMeta('og:description', description || DEFAULT_DESCRIPTION, true);
     setMeta('og:type', type, true);
     setMeta('og:url', url || window.location.href, true);
-    setMeta('og:image', image || 'https://images.unsplash.com/photo-1758533696874-587c4e62940c?w=1200&h=630&fit=crop', true);
+    setMeta('og:image', image || DEFAULT_IMAGE, true);
     setMeta('og:site_name', 'TratorShop', true);
     setMeta('og:locale', 'pt_BR', true);
     
     // Twitter Card tags
     setMeta('twitter:card', 'summary_large_image');
-    setMeta('twitter:title', title || 'TratorShop - Marketplace de Máquinas Agrícolas');
-    setMeta('twitter:description', description || 'Compre e venda tratores, colheitadeiras e implementos no MS');
-    setMeta('twitter:image', image || 'https://images.unsplash.com/photo-1758533696874-587c4e62940c?w=1200&h=630&fit=crop');
+    setMeta('twitter:title', title || DEFAULT_TITLE);
+    setMeta('twitter:description', description || DEFAULT_DESCRIPTION);
+    setMeta('twitter:image', image || DEFAULT_IMAGE);
 
     // Cleanup function not needed as we want tags to persist
   }, [title, description, image, url, type, keywords]);
@@ -51,7 +63,7 @@ export const SEOHead = ({
   return null;
 };
 
-// Generate listing-specific SEO data
+// Generate listing-specific SEO data with local focus
 export const getListingSEO = (listing) => {
   if (!listing) return {};
   
@@ -70,8 +82,8 @@ export const getListingSEO = (listing) => {
     pecas: 'Peça'
   };
 
-  const title = `${listing.title} - ${formatPrice(listing.price)} em ${listing.city}`;
-  const description = `${categoryNames[listing.category] || 'Máquina'} ${listing.brand || ''} ${listing.model || ''} ${listing.year || ''} à venda em ${listing.city}, MS. ${listing.condition === 'novo' ? 'Novo' : listing.condition === 'seminovo' ? 'Seminovo' : 'Usado'}. ${listing.hours_used ? listing.hours_used + ' horas de uso.' : ''} Contato via WhatsApp.`.trim().replace(/\s+/g, ' ');
+  const title = `${listing.title} - ${formatPrice(listing.price)} em ${listing.city} MS`;
+  const description = `${categoryNames[listing.category] || 'Máquina'} ${listing.brand || ''} ${listing.model || ''} ${listing.year || ''} à venda em ${listing.city}, Mato Grosso do Sul. ${listing.condition === 'novo' ? 'Novo' : listing.condition === 'seminovo' ? 'Seminovo' : 'Usado'}. ${listing.hours_used ? listing.hours_used + ' horas de uso.' : ''} Anuncie grátis no TratorShop.`.trim().replace(/\s+/g, ' ');
   
   const keywords = [
     listing.title,
@@ -81,45 +93,47 @@ export const getListingSEO = (listing) => {
     listing.city,
     'MS',
     'Mato Grosso do Sul',
+    'Campo Grande',
     'máquina agrícola',
-    'comprar',
-    'vender'
+    'comprar trator',
+    'vender trator',
+    'implementos agrícolas'
   ].filter(Boolean).join(', ');
 
   return { title, description, keywords };
 };
 
-// Generate search page SEO data
+// Generate search page SEO data with local focus
 export const getSearchSEO = (category, city, search) => {
   const categoryNames = {
     tratores: 'Tratores',
-    implementos: 'Implementos',
+    implementos: 'Implementos Agrícolas',
     colheitadeiras: 'Colheitadeiras',
-    pecas: 'Peças'
+    pecas: 'Peças Agrícolas'
   };
 
-  let title = 'Máquinas Agrícolas';
-  let description = 'Encontre tratores, colheitadeiras, implementos e peças no Mato Grosso do Sul.';
+  let title = 'Máquinas Agrícolas em Campo Grande MS';
+  let description = 'Encontre tratores, colheitadeiras e implementos agrícolas em Campo Grande MS e todo Mato Grosso do Sul. Anuncie grátis no TratorShop.';
 
   if (category && categoryNames[category]) {
-    title = categoryNames[category];
-    description = `${categoryNames[category]} à venda no Mato Grosso do Sul. Encontre as melhores ofertas.`;
+    title = `${categoryNames[category]} em ${city || 'Campo Grande'} MS`;
+    description = `${categoryNames[category]} à venda em ${city || 'Campo Grande'}, Mato Grosso do Sul. Encontre as melhores ofertas no TratorShop.`;
   }
 
   if (city) {
-    title += ` em ${city}`;
-    description = description.replace('no Mato Grosso do Sul', `em ${city}, MS`);
+    title = category ? `${categoryNames[category]} em ${city} MS` : `Máquinas Agrícolas em ${city} MS`;
+    description = `Compre e venda tratores, colheitadeiras e implementos em ${city}, Mato Grosso do Sul. Anuncie grátis no TratorShop.`;
   }
 
   if (search) {
-    title = `Busca: ${search}`;
-    description = `Resultados para "${search}" no TratorShop. Máquinas agrícolas no MS.`;
+    title = `${search} em Campo Grande MS | TratorShop`;
+    description = `Resultados para "${search}" em Campo Grande MS e Mato Grosso do Sul. Encontre máquinas agrícolas no TratorShop.`;
   }
 
   return { 
     title, 
     description,
-    keywords: `${category || 'máquinas agrícolas'}, ${city || 'Mato Grosso do Sul'}, comprar, vender, agricultura`
+    keywords: `${category || 'máquinas agrícolas'}, ${city || 'Campo Grande'}, MS, Mato Grosso do Sul, comprar trator, vender trator, implementos agrícolas`
   };
 };
 

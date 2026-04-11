@@ -5818,8 +5818,9 @@ const SellerProfilePage = () => {
   return (
     <div className="min-h-screen bg-slate-50" data-testid="seller-profile-page">
       <SEOHead 
-        title={`${seller.name} - Vendedor | TratorShop`}
-        description={seller.bio || `Veja os anúncios de ${seller.name} no TratorShop`}
+        title={`${seller.name} - Vendedor de Máquinas Agrícolas em MS`}
+        description={seller.bio || `Veja os anúncios de ${seller.name} no TratorShop. Tratores, colheitadeiras e implementos em Campo Grande MS e Mato Grosso do Sul.`}
+        keywords={`${seller.name}, vendedor Campo Grande MS, tratores MS, máquinas agrícolas Mato Grosso do Sul`}
       />
       
       {/* Profile Header */}
