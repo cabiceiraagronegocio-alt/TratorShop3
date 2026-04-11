@@ -8,7 +8,7 @@ import {
   Plus, LogOut, User, Settings, Tractor, Wrench, Cog, Loader2,
   ChevronLeft, MessageCircle, Share2, Heart, Filter, Grid, List,
   Upload, Image as ImageIcon, Trash2, Edit, Camera, Shield, Lock, Mail,
-  Store, Users, Building2, Package, Check, Instagram, Globe
+  Store, Users, Building2, Package, Check, Instagram, Globe, Facebook
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -630,38 +630,59 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
   const [uploadingCount, setUploadingCount] = useState(0);
   const fileInputRef = useRef(null);
 
-  // Compress image using canvas
-  const compressImage = async (file, maxWidth = 1200, quality = 0.8) => {
-    return new Promise((resolve) => {
+  // Compress image using canvas - optimized for mobile
+  const compressImage = async (file, maxWidth = 1200, quality = 0.75) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Failed to read file'));
       reader.onload = (e) => {
         const img = new Image();
+        img.onerror = () => reject(new Error('Failed to load image'));
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          
-          // Scale down if needed
-          if (width > maxWidth) {
-            height = (height * maxWidth) / width;
-            width = maxWidth;
+          try {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            
+            // Scale down if needed - more aggressive for mobile
+            if (width > maxWidth) {
+              height = (height * maxWidth) / width;
+              width = maxWidth;
+            }
+            
+            // Also limit height for very tall images
+            const maxHeight = 1600;
+            if (height > maxHeight) {
+              width = (width * maxHeight) / height;
+              height = maxHeight;
+            }
+            
+            canvas.width = Math.round(width);
+            canvas.height = Math.round(height);
+            
+            const ctx = canvas.getContext('2d');
+            // Use better quality settings for mobile
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            canvas.toBlob(
+              (blob) => {
+                if (blob) {
+                  resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
+                    type: 'image/jpeg'
+                  }));
+                } else {
+                  // Fallback if toBlob fails (some mobile browsers)
+                  resolve(file);
+                }
+              },
+              'image/jpeg',
+              quality
+            );
+          } catch (err) {
+            reject(err);
           }
-          
-          canvas.width = width;
-          canvas.height = height;
-          
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          canvas.toBlob(
-            (blob) => {
-              resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
-                type: 'image/jpeg'
-              }));
-            },
-            'image/jpeg',
-            quality
-          );
         };
         img.src = e.target.result;
       };
@@ -669,16 +690,18 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
     });
   };
 
-  // Convert HEIC to JPEG
+  // Convert HEIC to JPEG - improved for iOS
   const convertHeicToJpeg = async (file) => {
     try {
       // Dynamic import for heic2any library
       const heic2any = (await import('heic2any')).default;
-      const blob = await heic2any({
+      const result = await heic2any({
         blob: file,
         toType: 'image/jpeg',
-        quality: 0.8
+        quality: 0.75
       });
+      // heic2any may return array or single blob
+      const blob = Array.isArray(result) ? result[0] : result;
       return new File([blob], file.name.replace(/\.heic$/i, '.jpg'), {
         type: 'image/jpeg'
       });
@@ -729,13 +752,20 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
         // Convert HEIC to JPEG if needed
         if (isHeic) {
           toast.info(`Convertendo ${file.name}...`);
-          file = await convertHeicToJpeg(file);
+          try {
+            file = await convertHeicToJpeg(file);
+          } catch (heicErr) {
+            console.error("HEIC conversion error:", heicErr);
+            toast.error(`Erro ao converter ${file.name}. Tente tirar a foto novamente.`);
+            continue;
+          }
         }
         
-        // Always compress images for mobile - reduces upload time
-        // Compress all images larger than 500KB or if they don't have proper dimensions
-        if (file.size > 500 * 1024) {
+        // Always compress images for mobile - reduces upload time and size
+        // Compress all images larger than 300KB for better mobile experience
+        if (file.size > 300 * 1024) {
           try {
+            toast.info(`Otimizando ${file.name}...`);
             file = await compressImage(file);
           } catch (compressErr) {
             console.warn("Compression failed, using original:", compressErr);
@@ -752,7 +782,7 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
           { 
             withCredentials: true,
             headers: { 'Content-Type': 'multipart/form-data' },
-            timeout: 60000, // 60 second timeout for mobile
+            timeout: 90000, // 90 second timeout for slow mobile connections
             onUploadProgress: (progressEvent) => {
               if (progressEvent.total) {
                 const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -848,6 +878,7 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
               type="file"
               accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif"
               multiple
+              capture="environment"
               onChange={handleFileSelect}
               className="hidden"
               disabled={uploading}
@@ -5831,6 +5862,28 @@ const SellerProfilePage = () => {
                 >
                   <Globe className="w-4 h-4" />
                   {seller.website.replace(/^https?:\/\//, '')}
+                </a>
+              )}
+              {seller.instagram && (
+                <a 
+                  href={seller.instagram.startsWith('http') ? seller.instagram : `https://instagram.com/${seller.instagram.replace('@', '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#F9C02D] text-sm flex items-center justify-center md:justify-start gap-1 hover:underline mt-1"
+                >
+                  <Instagram className="w-4 h-4" />
+                  {seller.instagram.replace(/^https?:\/\/(www\.)?instagram\.com\//, '@')}
+                </a>
+              )}
+              {seller.facebook && (
+                <a 
+                  href={seller.facebook.startsWith('http') ? seller.facebook : `https://facebook.com/${seller.facebook.replace('@', '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#F9C02D] text-sm flex items-center justify-center md:justify-start gap-1 hover:underline mt-1"
+                >
+                  <Facebook className="w-4 h-4" />
+                  {seller.facebook.replace(/^https?:\/\/(www\.)?facebook\.com\//, '')}
                 </a>
               )}
             </div>

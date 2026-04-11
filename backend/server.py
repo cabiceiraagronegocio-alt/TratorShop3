@@ -251,6 +251,9 @@ class UserProfileUpdate(BaseModel):
     bio: Optional[str] = None
     address: Optional[str] = None
     store_name: Optional[str] = None
+    website: Optional[str] = None
+    instagram: Optional[str] = None
+    facebook: Optional[str] = None
 
 # Plan Selection Model
 class PlanSelection(BaseModel):
@@ -304,7 +307,7 @@ def verify_password(password: str, stored_hash: str) -> bool:
         salt, hashed = stored_hash.split(':')
         new_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
         return new_hash.hex() == hashed
-    except:
+    except (ValueError, AttributeError):
         return False
 
 # MS Cities for dropdown
@@ -628,21 +631,49 @@ class ProfileUpdate(BaseModel):
     website: Optional[str] = None
 
 @api_router.put("/user/profile")
-async def update_profile(profile: ProfileUpdate, request: Request):
+async def update_profile(profile: UserProfileUpdate, request: Request):
     """Update user profile"""
+    import re
     user = await require_user(request)
     
     update_data = {}
     if profile.name:
         update_data["name"] = profile.name
     if profile.phone is not None:
+        # Validate WhatsApp format
+        phone_digits = re.sub(r'\D', '', profile.phone)
+        if profile.phone.strip() and (len(phone_digits) < 10 or len(phone_digits) > 13):
+            raise HTTPException(status_code=400, detail="WhatsApp inválido. Informe um número válido.")
         update_data["phone"] = profile.phone
+        # Also update lead phone
+        await db.leads.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"phone": profile.phone}}
+        )
     if profile.bio is not None:
         update_data["bio"] = profile.bio
     if profile.address is not None:
         update_data["address"] = profile.address
     if profile.website is not None:
         update_data["website"] = profile.website
+    if profile.store_name is not None:
+        update_data["store_name"] = profile.store_name
+    if profile.instagram is not None:
+        # Auto-format Instagram
+        ig = profile.instagram.strip()
+        if ig.startswith("@"):
+            ig = f"https://instagram.com/{ig[1:]}"
+        elif ig and not ig.startswith("http"):
+            ig = f"https://instagram.com/{ig}"
+        update_data["instagram"] = ig
+    if profile.facebook is not None:
+        # Auto-format Facebook
+        fb = profile.facebook.strip()
+        if fb.startswith("@"):
+            fb = f"https://facebook.com/{fb[1:]}"
+        elif fb and not fb.startswith("http"):
+            fb = f"https://facebook.com/{fb}"
+        update_data["facebook"] = fb
     
     if update_data:
         await db.users.update_one(
@@ -786,38 +817,6 @@ async def select_plan(data: PlanSelection, request: Request):
         "plan": plan,
         "expiration_date": expiration_date.isoformat()
     }
-
-@api_router.put("/user/profile")
-async def update_user_profile(data: UserProfileUpdate, request: Request):
-    """Update user profile"""
-    user = await require_user(request)
-    
-    update_data = {}
-    if data.name is not None:
-        update_data["name"] = data.name
-    if data.phone is not None:
-        update_data["phone"] = data.phone
-        # Also update lead phone
-        await db.leads.update_one(
-            {"user_id": user["user_id"]},
-            {"$set": {"phone": data.phone}}
-        )
-    if data.bio is not None:
-        update_data["bio"] = data.bio
-    if data.address is not None:
-        update_data["address"] = data.address
-    if data.store_name is not None:
-        update_data["store_name"] = data.store_name
-    
-    if update_data:
-        await db.users.update_one(
-            {"user_id": user["user_id"]},
-            {"$set": update_data}
-        )
-    
-    # Return updated user
-    updated_user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "password_hash": 0})
-    return updated_user
 
 @api_router.post("/user/profile/photo")
 async def upload_profile_photo(request: Request, file: UploadFile = File(...)):
@@ -1241,6 +1240,8 @@ async def get_seller_public_profile(user_id: str):
         "bio": user.get("bio"),
         "address": user.get("address"),
         "website": user.get("website"),
+        "instagram": user.get("instagram"),
+        "facebook": user.get("facebook"),
         "phone": user.get("phone"),
         "role": user.get("role", "user"),
         "plan_type": user.get("plan_type"),
@@ -1406,23 +1407,6 @@ async def get_admin_stats(request: Request):
         },
         "categories": categories
     }
-
-@api_router.put("/admin/users/{user_id}")
-async def admin_update_user(user_id: str, data: AdminUpdateUser, request: Request):
-    """Admin update user details"""
-    await require_admin(request)
-    
-    user = await db.users.find_one({"user_id": user_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    
-    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
-    
-    if update_data:
-        await db.users.update_one({"user_id": user_id}, {"$set": update_data})
-    
-    updated_user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
-    return updated_user
 
 @api_router.delete("/admin/users/{user_id}")
 async def admin_delete_user(user_id: str, request: Request):
@@ -1795,16 +1779,26 @@ async def create_listing(listing: ListingCreate, request: Request):
             detail="Seu cadastro ainda está em análise. Aguarde a aprovação do administrador para criar anúncios."
         )
     
-    # Idempotency check - prevent duplicate listings within 30 seconds
-    thirty_seconds_ago = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+    # Idempotency check - prevent duplicate listings within 60 seconds with same title/description
+    sixty_seconds_ago = (datetime.now(timezone.utc) - timedelta(seconds=60)).isoformat()
     duplicate = await db.listings.find_one({
         "user_id": user["user_id"],
         "title": listing.title,
-        "created_at": {"$gte": thirty_seconds_ago}
+        "created_at": {"$gte": sixty_seconds_ago}
     })
     if duplicate:
         # Return existing listing instead of creating duplicate
         return {"listing_id": duplicate["listing_id"], "message": "Anúncio já criado", "duplicate": True}
+    
+    # Also check for exact title+price match in pending/approved listings (broader duplicate check)
+    existing_similar = await db.listings.find_one({
+        "user_id": user["user_id"],
+        "title": listing.title,
+        "price": listing.price,
+        "status": {"$in": ["pending", "approved"]}
+    })
+    if existing_similar:
+        return {"listing_id": existing_similar["listing_id"], "message": "Anúncio com mesmo título e preço já existe", "duplicate": True}
     
     # Check listing limit based on user type
     current_count = await db.listings.count_documents({
@@ -1957,7 +1951,6 @@ async def delete_listing_image(listing_id: str, image_index: int, request: Reque
         raise HTTPException(status_code=400, detail="Invalid image index")
     
     # Remove image from list
-    image_path = images[image_index]
     images.pop(image_index)
     
     await db.listings.update_one(
@@ -1979,7 +1972,7 @@ async def get_file(path: str):
     try:
         data, content_type = get_object(path)
         return Response(content=data, media_type=content_type)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404, detail="File not found")
 
 # =============================================================================
