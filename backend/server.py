@@ -13,6 +13,8 @@ from datetime import datetime, timezone, timedelta
 import requests
 import hashlib
 import secrets
+import unicodedata
+import re
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -117,6 +119,7 @@ class UserCreate(BaseModel):
 class ListingBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
     listing_id: str
+    slug: Optional[str] = None
     user_id: str
     title: str
     description: str
@@ -309,6 +312,24 @@ def verify_password(password: str, stored_hash: str) -> bool:
         return new_hash.hex() == hashed
     except (ValueError, AttributeError):
         return False
+
+def generate_listing_slug(title: str, city: str, listing_id: str) -> str:
+    """Generate SEO-friendly slug from title and city"""
+    # Normalize unicode characters (remove accents)
+    text = f"{title} {city} ms"
+    text = unicodedata.normalize('NFKD', text)
+    text = text.encode('ascii', 'ignore').decode('ascii')
+    # Convert to lowercase and replace spaces/special chars with hyphens
+    text = text.lower()
+    text = re.sub(r'[^a-z0-9\s-]', '', text)
+    text = re.sub(r'[\s_]+', '-', text)
+    text = re.sub(r'-+', '-', text)
+    text = text.strip('-')
+    # Limit length and add unique suffix
+    text = text[:80]
+    # Add short unique suffix from listing_id
+    suffix = listing_id.replace('listing_', '')[:6]
+    return f"{text}-{suffix}"
 
 # MS Cities for dropdown
 MS_CITIES = [
@@ -1749,15 +1770,19 @@ async def get_featured_listings(limit: int = 8):
     listings = await db.listings.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     return listings
 
-@api_router.get("/listings/{listing_id}")
-async def get_listing(listing_id: str):
-    """Get single listing by ID"""
-    listing = await db.listings.find_one({"listing_id": listing_id}, {"_id": 0})
+@api_router.get("/listings/{identifier}")
+async def get_listing(identifier: str):
+    """Get single listing by ID or slug"""
+    # Try to find by listing_id first, then by slug
+    listing = await db.listings.find_one({"listing_id": identifier}, {"_id": 0})
+    if not listing:
+        # Try by slug
+        listing = await db.listings.find_one({"slug": identifier}, {"_id": 0})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     
     # Increment views
-    await db.listings.update_one({"listing_id": listing_id}, {"$inc": {"views": 1}})
+    await db.listings.update_one({"listing_id": listing["listing_id"]}, {"$inc": {"views": 1}})
     listing["views"] = listing.get("views", 0) + 1
     
     # Get seller info
@@ -1820,8 +1845,12 @@ async def create_listing(listing: ListingCreate, request: Request):
     listing_id = f"listing_{uuid.uuid4().hex[:12]}"
     now = datetime.now(timezone.utc)
     
+    # Generate SEO-friendly slug
+    slug = generate_listing_slug(listing.title, listing.city, listing_id)
+    
     listing_doc = {
         "listing_id": listing_id,
+        "slug": slug,
         "user_id": user["user_id"],
         "title": listing.title,
         "description": listing.description,
@@ -1846,7 +1875,7 @@ async def create_listing(listing: ListingCreate, request: Request):
     }
     
     await db.listings.insert_one(listing_doc)
-    return {"listing_id": listing_id, "message": "Anúncio criado e aguardando aprovação"}
+    return {"listing_id": listing_id, "slug": slug, "message": "Anúncio criado e aguardando aprovação"}
 
 @api_router.put("/listings/{listing_id}")
 async def update_listing(listing_id: str, listing: ListingUpdate, request: Request):
@@ -2426,10 +2455,22 @@ async def startup():
     await db.listings.create_index([("user_id", 1)])
     await db.listings.create_index([("category", 1)])
     await db.listings.create_index([("city", 1)])
+    await db.listings.create_index([("slug", 1)])
     await db.users.create_index([("email", 1)], unique=True)
     await db.user_sessions.create_index([("session_token", 1)], unique=True)
     await db.admins.create_index([("email", 1)], unique=True)
     await db.admin_sessions.create_index([("session_token", 1)], unique=True)
+    
+    # Generate slugs for listings that don't have one
+    listings_without_slug = await db.listings.find({"slug": {"$exists": False}}).to_list(1000)
+    for listing in listings_without_slug:
+        slug = generate_listing_slug(listing["title"], listing["city"], listing["listing_id"])
+        await db.listings.update_one(
+            {"listing_id": listing["listing_id"]},
+            {"$set": {"slug": slug}}
+        )
+    if listings_without_slug:
+        logger.info(f"Generated slugs for {len(listings_without_slug)} listings")
     
     # Create default admin if not exists
     default_admin = await db.admins.find_one({"email": "admin@tratorshop.com"})

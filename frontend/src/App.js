@@ -491,7 +491,7 @@ const ListingCard = ({ listing }) => {
   return (
     <Card 
       className="overflow-hidden cursor-pointer card-hover transition-card group border-slate-200"
-      onClick={() => navigate(`/anuncio/${listing.listing_id}`)}
+      onClick={() => navigate(`/anuncio/${listing.slug || listing.listing_id}`)}
       data-testid={`listing-card-${listing.listing_id}`}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
