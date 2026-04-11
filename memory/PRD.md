@@ -1,45 +1,64 @@
 # TratorShop - PRD Atualizado
 
-## Última Atualização: 30/03/2026
+## Última Atualização: 11/04/2026
 
 ---
 
-## CORREÇÕES IMPLEMENTADAS NESTA SESSÃO
+## CORREÇÕES IMPLEMENTADAS (11/04/2026)
 
-### 1. Planos Trimestrais ✅
-- Badge "Válido por 3 meses" adicionado em ambos os planos no onboarding
+### 1. WhatsApp Obrigatório no Cadastro ✅
+- Campo obrigatório no frontend com validação de 10-13 dígitos
+- Validação no backend retorna erro claro: "Informe um WhatsApp válido para continuar"
+- Essencial para geração de leads
+
+### 2. Proteção contra Duplicação de Anúncios ✅
+- Janela de idempotência de 60 segundos
+- Verificação adicional: título + preço iguais em anúncios ativos
+- Frontend já tinha proteção contra duplo clique
+
+### 3. Melhorias no Upload Mobile ✅
+- Compressão de imagens melhorada (300KB threshold)
+- Timeout aumentado para 90 segundos
+- Suporte a HEIC/HEIF do iPhone
+- Atributo `capture="environment"` para câmera
+
+### 4. Facebook e Instagram no Perfil do Vendedor ✅
+- Campos adicionados ao modelo de usuário
+- Auto-formatação: `@usuario` → `https://facebook.com/usuario`
+- Exibição com ícones na página `/vendedor/{user_id}`
+
+### 5. Modal de Edição Completa do Admin ✅
+- Todos os campos: Nome, Email, Senha, WhatsApp, Tipo, Limite, Status, Bio, Endereço, Website, Instagram, Facebook
+- Hash bcrypt aplicado ao salvar nova senha
+- Validação de email único
+
+### 6. Limpeza de Código ✅
+- Removidos endpoints duplicados no backend
+- Corrigido `client.close()` que estava fora de função
+- Linting 100% sem erros
+
+---
+
+## CORREÇÕES ANTERIORES (30/03/2026)
+
+### Planos Trimestrais ✅
+- Badge "Válido por 3 meses" adicionado em ambos os planos
 - Anúncio Único: 1 anúncio | R$ 49,00 | Válido por 3 meses
 - Lojista: 20 anúncios | R$ 149,00 | Válido por 3 meses
 
-### 2. Página do Vendedor ✅
+### Página do Vendedor ✅
 - Perfil público em `/vendedor/{user_id}`
-- Mostra: foto, nome, bio, endereço, website, WhatsApp
-- Botão compartilhar funcionando
-- Lista de anúncios do vendedor
+- Mostra: foto, nome, bio, endereço, website, WhatsApp, Instagram, Facebook
 
-### 3. Link para Perfil do Vendedor no Anúncio ✅
-- Página de detalhes do anúncio agora mostra "Ver perfil do vendedor →"
-- Link clicável para `/vendedor/{user_id}`
-
-### 4. Upload de Foto de Perfil ✅
+### Upload de Foto de Perfil ✅
 - Endpoint `/api/user/profile-picture` funcionando
-- Imagens são salvas corretamente no storage
-- Frontend atualiza foto após upload
-- Foto exibida corretamente em todas as páginas (header, perfil, admin)
+- Imagens salvas no Emergent Object Storage
 
-### 5. Campo Website no Perfil ✅
-- Campo adicionado no modelo de usuário
-- Formulário de edição inclui campo website
-- Exibido na página pública do vendedor com ícone
-
-### 6. Admin: Visualização e Exclusão de Fotos ✅
-- Modal de edição de anúncio mostra galeria de fotos
-- Botão de excluir foto individual (hover)
-- Endpoint `/api/admin/listings/{id}/images/{index}` DELETE
-
-### 7. Notificação Usuários Pendentes ✅
-- Dashboard admin mostra estatísticas de pending_approval
-- Tab separada para usuários pendentes
+### Admin: Gestão Completa ✅
+- Dashboard com estatísticas
+- Gestão de anúncios (aprovar, rejeitar, editar, destacar, expirar)
+- Visualizar e excluir fotos dos anúncios
+- Gestão de usuários completa com edição de todos os campos
 
 ---
 
@@ -54,28 +73,73 @@
 ### Autenticação & Fluxo
 - ✅ Login Email/Senha e Google
 - ✅ Status pending_approval até admin liberar
-- ✅ Mensagem "Entraremos em contato via WhatsApp"
+- ✅ WhatsApp obrigatório no cadastro
 
 ### Perfil do Usuário
 - ✅ Upload foto de perfil
-- ✅ Edição: nome, telefone, bio, endereço, website
-- ✅ Perfil público do vendedor
+- ✅ Edição: nome, telefone, bio, endereço, website, instagram, facebook
+- ✅ Perfil público do vendedor com links sociais
 
 ### Painel Admin
 - ✅ Dashboard com estatísticas
-- ✅ Gestão de anúncios (aprovar, rejeitar, editar, destacar, expirar)
-- ✅ Visualizar e excluir fotos dos anúncios
-- ✅ Gestão de usuários completa
+- ✅ Gestão de anúncios completa
+- ✅ Modal de edição completa de usuários
 - ✅ Promover dealer/admin
+
+### Anúncios
+- ✅ Criação com proteção anti-duplicação
+- ✅ Upload de imagens com compressão (mobile-friendly)
+- ✅ Suporte a HEIC (iPhone)
 
 ---
 
-## CREDENCIAIS
+## CREDENCIAIS DE TESTE
 
 | Tipo | Email | Senha |
 |------|-------|-------|
 | Admin | admin@tratorshop.com | Admin@123 |
 | Usuário | novousuario@teste.com | teste123456 |
+| Lojista | lojista@teste.com | teste123456 |
+
+---
+
+## ARQUITETURA
+
+```
+/app/
+├── backend/
+│   ├── server.py           # API FastAPI (~2450 linhas)
+│   ├── requirements.txt    
+│   └── .env                
+├── frontend/
+│   ├── src/
+│   │   ├── App.js          # Frontend React (~6000 linhas)
+│   │   ├── index.js
+│   │   └── index.css
+│   ├── package.json
+│   └── .env
+└── memory/
+    └── PRD.md
+```
+
+## STACK TECNOLÓGICA
+
+- **Frontend**: React 19, React Router v7, TailwindCSS, Shadcn/UI, Leaflet
+- **Backend**: FastAPI, Motor (MongoDB Async)
+- **Storage**: Emergent Object Storage
+- **Auth**: JWT interno + Google OAuth (Emergent Auth)
+
+---
+
+## TAREFAS PENDENTES
+
+### P1 - Prioridade Alta
+- [ ] Notificações por email para aprovação/rejeição de anúncios
+- [ ] Filtros avançados de busca (ano, horas de uso)
+
+### P2 - Prioridade Média
+- [ ] Sistema de favoritos
+- [ ] Chat entre compradores e vendedores
 
 ---
 
@@ -85,4 +149,4 @@ GitHub: https://github.com/cabiceiraagronegocio-alt/TratorShop3
 
 ---
 
-*Atualizado em 30/03/2026*
+*Atualizado em 11/04/2026*
