@@ -2404,6 +2404,83 @@ async def get_stats():
 async def root():
     return {"message": "TratorShop API", "version": "1.0.0"}
 
+# =============================================================================
+# SITEMAP (before include_router)
+# =============================================================================
+
+@api_router.get("/seo/sitemap")
+async def api_sitemap():
+    """API endpoint for sitemap - generates dynamic sitemap.xml"""
+    base_url = "https://tratorshop.com.br"
+    
+    # Start XML
+    xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    
+    # Static pages
+    static_pages = [
+        {"loc": "/", "priority": "1.0", "changefreq": "daily"},
+        {"loc": "/tratores", "priority": "0.9", "changefreq": "daily"},
+        {"loc": "/implementos", "priority": "0.9", "changefreq": "daily"},
+        {"loc": "/colheitadeiras", "priority": "0.9", "changefreq": "daily"},
+        {"loc": "/pecas", "priority": "0.9", "changefreq": "daily"},
+        {"loc": "/buscar", "priority": "0.8", "changefreq": "daily"},
+    ]
+    
+    for page in static_pages:
+        xml_content += "  <url>\n"
+        xml_content += f"    <loc>{base_url}{page['loc']}</loc>\n"
+        xml_content += f"    <changefreq>{page['changefreq']}</changefreq>\n"
+        xml_content += f"    <priority>{page['priority']}</priority>\n"
+        xml_content += "  </url>\n"
+    
+    # Get all approved listings
+    listings = await db.listings.find(
+        {"status": "approved"},
+        {"_id": 0, "slug": 1, "listing_id": 1, "created_at": 1}
+    ).to_list(10000)
+    
+    for listing in listings:
+        slug = listing.get("slug") or listing["listing_id"]
+        lastmod = listing.get("created_at", "")[:10] if listing.get("created_at") else ""
+        xml_content += "  <url>\n"
+        xml_content += f"    <loc>{base_url}/anuncio/{slug}</loc>\n"
+        if lastmod:
+            xml_content += f"    <lastmod>{lastmod}</lastmod>\n"
+        xml_content += "    <changefreq>weekly</changefreq>\n"
+        xml_content += "    <priority>0.8</priority>\n"
+        xml_content += "  </url>\n"
+    
+    # Get all active sellers/dealers
+    sellers = await db.users.find(
+        {"status": "active"},
+        {"_id": 0, "user_id": 1, "created_at": 1}
+    ).to_list(10000)
+    
+    for seller in sellers:
+        lastmod = seller.get("created_at", "")[:10] if seller.get("created_at") else ""
+        xml_content += "  <url>\n"
+        xml_content += f"    <loc>{base_url}/vendedor/{seller['user_id']}</loc>\n"
+        if lastmod:
+            xml_content += f"    <lastmod>{lastmod}</lastmod>\n"
+        xml_content += "    <changefreq>weekly</changefreq>\n"
+        xml_content += "    <priority>0.7</priority>\n"
+        xml_content += "  </url>\n"
+    
+    xml_content += "</urlset>"
+    
+    return Response(content=xml_content, media_type="application/xml")
+
+@api_router.get("/seo/robots")
+async def api_robots():
+    """API endpoint for robots.txt"""
+    content = """User-agent: *
+Allow: /
+
+Sitemap: https://tratorshop.com.br/sitemap.xml
+"""
+    return Response(content=content, media_type="text/plain")
+
 # Include router
 app.include_router(api_router)
 
