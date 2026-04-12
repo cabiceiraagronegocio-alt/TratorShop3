@@ -528,7 +528,7 @@ const ListingCard = ({ listing }) => {
         </h3>
         <div className="flex items-center gap-1 text-slate-500 text-sm">
           <MapPin className="w-4 h-4" />
-          <span>{listing.city}, {listing.state}</span>
+          <span>{listing.city?.includes(' - MS') ? listing.city : `${listing.city}, ${listing.state}`}</span>
         </div>
       </CardContent>
       <CardFooter className="px-4 pb-4 pt-0 flex items-center justify-between text-xs text-slate-400">
@@ -1496,7 +1496,7 @@ const ListingDetailPage = () => {
                 <div className="flex items-center gap-4 text-slate-500">
                   <span className="flex items-center gap-1">
                     <MapPin className="w-4 h-4" />
-                    {listing.city}, {listing.state}
+                    {listing.city?.includes(' - MS') ? listing.city : `${listing.city}, ${listing.state}`}
                   </span>
                   <span className="flex items-center gap-1">
                     <Eye className="w-4 h-4" />

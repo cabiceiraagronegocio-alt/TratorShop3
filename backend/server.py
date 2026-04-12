@@ -315,8 +315,10 @@ def verify_password(password: str, stored_hash: str) -> bool:
 
 def generate_listing_slug(title: str, city: str, listing_id: str) -> str:
     """Generate SEO-friendly slug from title and city"""
+    # Remove " - MS" suffix if present for slug generation
+    city_clean = city.replace(" - MS", "").strip()
     # Normalize unicode characters (remove accents)
-    text = f"{title} {city} ms"
+    text = f"{title} {city_clean} ms"
     text = unicodedata.normalize('NFKD', text)
     text = text.encode('ascii', 'ignore').decode('ascii')
     # Convert to lowercase and replace spaces/special chars with hyphens
@@ -330,6 +332,14 @@ def generate_listing_slug(title: str, city: str, listing_id: str) -> str:
     # Add short unique suffix from listing_id
     suffix = listing_id.replace('listing_', '')[:6]
     return f"{text}-{suffix}"
+
+def format_city_ms(city: str) -> str:
+    """Format city with ' - MS' suffix for SEO"""
+    if not city:
+        return city
+    # Remove existing suffix if present to avoid duplication
+    city_clean = city.replace(" - MS", "").replace(" MS", "").strip()
+    return f"{city_clean} - MS"
 
 # MS Cities for dropdown
 MS_CITIES = [
@@ -1861,7 +1871,7 @@ async def create_listing(listing: ListingCreate, request: Request):
         "year": listing.year,
         "hours_used": listing.hours_used,
         "condition": listing.condition,
-        "city": listing.city,
+        "city": format_city_ms(listing.city),
         "state": "MS",
         "whatsapp": listing.whatsapp,
         "images": [],
@@ -1890,6 +1900,11 @@ async def update_listing(listing_id: str, listing: ListingUpdate, request: Reque
         raise HTTPException(status_code=403, detail="Not authorized")
     
     update_data = {k: v for k, v in listing.model_dump().items() if v is not None}
+    
+    # Format city with " - MS" if present
+    if "city" in update_data:
+        update_data["city"] = format_city_ms(update_data["city"])
+    
     if update_data:
         # Reset to pending if content changed
         if not user.get("is_admin"):
@@ -2548,6 +2563,18 @@ async def startup():
         )
     if listings_without_slug:
         logger.info(f"Generated slugs for {len(listings_without_slug)} listings")
+    
+    # Update cities to include " - MS" suffix for SEO
+    listings_without_ms = await db.listings.find({"city": {"$not": {"$regex": " - MS$"}}}).to_list(1000)
+    for listing in listings_without_ms:
+        if listing.get("city"):
+            formatted_city = format_city_ms(listing["city"])
+            await db.listings.update_one(
+                {"listing_id": listing["listing_id"]},
+                {"$set": {"city": formatted_city}}
+            )
+    if listings_without_ms:
+        logger.info(f"Updated {len(listings_without_ms)} listings with ' - MS' city suffix")
     
     # Create default admin if not exists
     default_admin = await db.admins.find_one({"email": "admin@tratorshop.com"})
