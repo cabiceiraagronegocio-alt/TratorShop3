@@ -7,6 +7,21 @@
 /* Leaflet CSS import */
 @import 'leaflet/dist/leaflet.css';
 
+/* Block any dynamically injected Emergent badge */
+#emergent-badge,
+[id*="emergent"],
+a[href*="emergent.sh"],
+a[href*="emergentagent"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    position: absolute !important;
+    left: -9999px !important;
+}
+
 body {
     margin: 0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", sans-serif;
