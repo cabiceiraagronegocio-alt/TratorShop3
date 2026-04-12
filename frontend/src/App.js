@@ -38,6 +38,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { SEOHead, getListingSEO, getSearchSEO } from "@/components/SEOHead";
+import { citiesMS } from "@/data/citiesMS";
 
 // Fix Leaflet default marker icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -455,6 +456,15 @@ const Footer = () => (
             >
               <Instagram className="w-5 h-5 text-white" />
             </a>
+            <a 
+              href="https://facebook.com/tratorshop" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors"
+              data-testid="footer-facebook"
+            >
+              <Facebook className="w-5 h-5 text-white" />
+            </a>
           </div>
           
           <div className="mt-4 pt-4 border-t border-white/10">
@@ -574,11 +584,12 @@ const CategoryCard = ({ category, image, count }) => {
 const SearchBar = ({ onSearch, initialQuery = '', initialCity = '' }) => {
   const [query, setQuery] = useState(initialQuery);
   const [city, setCity] = useState(initialCity);
-  const [cities, setCities] = useState([]);
+  const [cityFilter, setCityFilter] = useState('');
 
-  useEffect(() => {
-    axios.get(`${API}/cities`).then(res => setCities(res.data)).catch(() => {});
-  }, []);
+  // Filter cities based on input
+  const filteredCities = citiesMS.filter(c => 
+    c.toLowerCase().includes(cityFilter.toLowerCase())
+  );
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -599,14 +610,23 @@ const SearchBar = ({ onSearch, initialQuery = '', initialCity = '' }) => {
             data-testid="search-input"
           />
         </div>
-        <Select value={city} onValueChange={setCity}>
+        <Select value={city} onValueChange={(v) => { setCity(v); setCityFilter(''); }}>
           <SelectTrigger className="h-12 w-full sm:w-48 rounded-full border-slate-200" data-testid="city-select">
             <MapPin className="w-4 h-4 mr-2 text-slate-400" />
             <SelectValue placeholder="Cidade" />
           </SelectTrigger>
           <SelectContent>
+            <div className="px-2 py-1.5">
+              <Input
+                placeholder="Filtrar cidade..."
+                value={cityFilter}
+                onChange={(e) => setCityFilter(e.target.value)}
+                className="h-8 text-sm"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
             <SelectItem value="all">Todas as cidades</SelectItem>
-            {cities.map(c => (
+            {filteredCities.map(c => (
               <SelectItem key={c} value={c}>{c}</SelectItem>
             ))}
           </SelectContent>
@@ -1599,7 +1619,7 @@ const ListingFormPage = () => {
   
   const [loading, setLoading] = useState(false);
   const [fetchingListing, setFetchingListing] = useState(isEditing);
-  const [cities, setCities] = useState([]);
+  const [cityFilter, setCityFilter] = useState('');
   const [images, setImages] = useState([]);
   const [listingId, setListingId] = useState(editId || null);
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
@@ -1616,6 +1636,11 @@ const ListingFormPage = () => {
     city: '',
     whatsapp: ''
   });
+
+  // Filter cities based on input
+  const filteredCities = citiesMS.filter(c => 
+    c.toLowerCase().includes(cityFilter.toLowerCase())
+  );
 
   const currentUser = user || location.state?.user;
 
@@ -1641,7 +1666,6 @@ const ListingFormPage = () => {
     };
     
     checkOnboarding();
-    axios.get(`${API}/cities`).then(res => setCities(res.data)).catch(() => {});
     
     // Fetch existing listing for editing
     if (isEditing) {
@@ -1898,12 +1922,21 @@ const ListingFormPage = () => {
             <CardContent className="space-y-4">
               <div>
                 <Label>Cidade *</Label>
-                <Select value={formData.city} onValueChange={(v) => handleChange('city', v)}>
+                <Select value={formData.city} onValueChange={(v) => { handleChange('city', v); setCityFilter(''); }}>
                   <SelectTrigger className="mt-1" data-testid="select-city">
                     <SelectValue placeholder="Selecione sua cidade" />
                   </SelectTrigger>
                   <SelectContent>
-                    {cities.map(city => (
+                    <div className="px-2 py-1.5">
+                      <Input
+                        placeholder="Filtrar cidade..."
+                        value={cityFilter}
+                        onChange={(e) => setCityFilter(e.target.value)}
+                        className="h-8 text-sm"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    {filteredCities.map(city => (
                       <SelectItem key={city} value={city}>{city}</SelectItem>
                     ))}
                   </SelectContent>
