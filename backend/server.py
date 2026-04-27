@@ -124,7 +124,7 @@ class ListingBase(BaseModel):
     title: str
     description: str
     category: str
-    price: float
+    price: Optional[float] = None  # Optional - shows "Consultar valor" when null
     brand: Optional[str] = None
     model: Optional[str] = None
     year: Optional[int] = None
@@ -146,7 +146,7 @@ class ListingCreate(BaseModel):
     title: str
     description: str
     category: str
-    price: float
+    price: Optional[float] = None  # Optional - shows "Consultar valor" when null
     brand: Optional[str] = None
     model: Optional[str] = None
     year: Optional[int] = None

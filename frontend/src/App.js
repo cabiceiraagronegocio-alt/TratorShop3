@@ -491,6 +491,9 @@ const ListingCard = ({ listing }) => {
     : 'https://images.unsplash.com/photo-1758533696874-587c4e62940c?w=400&h=300&fit=crop';
 
   const formatPrice = (price) => {
+    if (price === null || price === undefined || price === '') {
+      return 'Consultar valor';
+    }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
@@ -1389,6 +1392,9 @@ const ListingDetailPage = () => {
   };
 
   const formatPrice = (price) => {
+    if (price === null || price === undefined || price === '') {
+      return 'Consultar valor';
+    }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
@@ -1706,7 +1712,7 @@ const ListingFormPage = () => {
     // Prevent double submit
     if (loading) return;
     
-    if (!formData.title || !formData.description || !formData.category || !formData.price || !formData.city || !formData.whatsapp || !formData.condition) {
+    if (!formData.title || !formData.description || !formData.category || !formData.city || !formData.whatsapp || !formData.condition) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
@@ -1715,7 +1721,7 @@ const ListingFormPage = () => {
     try {
       const payload = {
         ...formData,
-        price: parseFloat(formData.price),
+        price: formData.price ? parseFloat(formData.price) : null,
         year: formData.year ? parseInt(formData.year) : null,
         hours_used: formData.hours_used ? parseInt(formData.hours_used) : null
       };
@@ -1827,13 +1833,13 @@ const ListingFormPage = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="price">Preço (R$) *</Label>
+                  <Label htmlFor="price">Preço (R$)</Label>
                   <Input
                     id="price"
                     type="number"
                     value={formData.price}
                     onChange={(e) => handleChange('price', e.target.value)}
-                    placeholder="150000"
+                    placeholder="Opcional — deixe em branco para 'Consultar valor'"
                     className="mt-1"
                     data-testid="input-price"
                   />
@@ -2447,6 +2453,9 @@ const DashboardPage = () => {
   };
 
   const formatPrice = (price) => {
+    if (price === null || price === undefined || price === '') {
+      return 'Consultar valor';
+    }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
@@ -3584,7 +3593,7 @@ const AdminPage = () => {
     
     try {
       const updateData = { ...editListingData };
-      if (updateData.price) updateData.price = parseFloat(updateData.price);
+      updateData.price = updateData.price ? parseFloat(updateData.price) : null;
       if (updateData.year) updateData.year = parseInt(updateData.year);
       if (updateData.hours_used) updateData.hours_used = parseInt(updateData.hours_used);
       
@@ -3640,6 +3649,9 @@ const AdminPage = () => {
   };
 
   const formatPrice = (price) => {
+    if (price === null || price === undefined || price === '') {
+      return 'Consultar valor';
+    }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
@@ -5596,6 +5608,9 @@ const StorePage = () => {
   }, [dealer, slug, category, page]);
 
   const formatPrice = (price) => {
+    if (price === null || price === undefined || price === '') {
+      return 'Consultar valor';
+    }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
@@ -5812,6 +5827,9 @@ const SellerProfilePage = () => {
   }, [userId]);
 
   const formatPrice = (price) => {
+    if (price === null || price === undefined || price === '') {
+      return 'Consultar valor';
+    }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
