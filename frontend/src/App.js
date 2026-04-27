@@ -901,7 +901,6 @@ const ImageUploader = ({ images, onImagesChange, listingId, maxImages = 10 }) =>
               type="file"
               accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif"
               multiple
-              capture="environment"
               onChange={handleFileSelect}
               className="hidden"
               disabled={uploading}
@@ -1629,6 +1628,7 @@ const ListingFormPage = () => {
   const [images, setImages] = useState([]);
   const [listingId, setListingId] = useState(editId || null);
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
+  const photosCardRef = useRef(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -1647,6 +1647,16 @@ const ListingFormPage = () => {
   const filteredCities = citiesMS.filter(c => 
     c.toLowerCase().includes(cityFilter.toLowerCase())
   );
+
+  // Scroll to photos section when listingId is set (after creating listing)
+  useEffect(() => {
+    if (listingId && photosCardRef.current && !isEditing) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        photosCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
+    }
+  }, [listingId, isEditing]);
 
   const currentUser = user || location.state?.user;
 
@@ -1771,7 +1781,7 @@ const ListingFormPage = () => {
         <form onSubmit={handleSubmit}>
           {/* Images Section - Show if listing exists */}
           {listingId && (
-            <Card className="mb-6">
+            <Card className="mb-6" ref={photosCardRef}>
               <CardHeader>
                 <h2 className="text-lg font-semibold" style={{ fontFamily: 'Outfit' }}>Fotos</h2>
                 <p className="text-sm text-slate-500">Adicione fotos para atrair mais compradores</p>
