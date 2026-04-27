@@ -940,6 +940,157 @@ const LocationMap = ({ city, className = "" }) => {
   );
 };
 
+// Image Lightbox Component
+const ImageLightbox = ({ images, initialIndex = 0, isOpen, onClose }) => {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+
+  // Reset index when opening with new initial index
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentIndex(initialIndex);
+    }
+  }, [isOpen, initialIndex]);
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') goToPrevious();
+      if (e.key === 'ArrowRight') goToNext();
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen, currentIndex]);
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % images.length);
+  };
+
+  const goToPrevious = () => {
+    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+  };
+
+  // Swipe handling for mobile
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isLeftSwipe) goToNext();
+    if (isRightSwipe) goToPrevious();
+  };
+
+  if (!isOpen || !images || images.length === 0) return null;
+
+  const getImageUrl = (path) => {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    return `${API}/files/${path}`;
+  };
+
+  return (
+    <div 
+      className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+      onClick={onClose}
+    >
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-50 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+        data-testid="lightbox-close"
+      >
+        <X className="w-6 h-6 text-white" />
+      </button>
+
+      {/* Image counter */}
+      <div className="absolute top-4 left-4 z-50 text-white bg-black/50 px-3 py-1 rounded-full text-sm">
+        {currentIndex + 1} / {images.length}
+      </div>
+
+      {/* Previous button */}
+      {images.length > 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-50 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+          data-testid="lightbox-prev"
+        >
+          <ChevronLeft className="w-6 h-6 text-white" />
+        </button>
+      )}
+
+      {/* Image */}
+      <div 
+        className="max-w-[90vw] max-h-[85vh] flex items-center justify-center"
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        <img
+          src={getImageUrl(images[currentIndex])}
+          alt={`Imagem ${currentIndex + 1}`}
+          className="max-w-full max-h-[85vh] object-contain rounded-lg"
+          draggable={false}
+        />
+      </div>
+
+      {/* Next button */}
+      {images.length > 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); goToNext(); }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 z-50 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+          data-testid="lightbox-next"
+        >
+          <ChevronRight className="w-6 h-6 text-white" />
+        </button>
+      )}
+
+      {/* Thumbnail strip */}
+      {images.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 overflow-x-auto max-w-[90vw] p-2">
+          {images.map((img, idx) => (
+            <button
+              key={idx}
+              onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); }}
+              className={`w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
+                idx === currentIndex ? 'border-white scale-110' : 'border-transparent opacity-60 hover:opacity-100'
+              }`}
+            >
+              <img
+                src={getImageUrl(img)}
+                alt={`Miniatura ${idx + 1}`}
+                className="w-full h-full object-cover"
+              />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Home Page
 const HomePage = () => {
   const navigate = useNavigate();
@@ -1359,6 +1510,7 @@ const ListingDetailPage = () => {
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   useEffect(() => {
     const fetchListing = async () => {
@@ -1375,6 +1527,11 @@ const ListingDetailPage = () => {
     };
     fetchListing();
   }, [id, navigate]);
+
+  const handleImageClick = (index) => {
+    setSelectedImage(index);
+    setLightboxOpen(true);
+  };
 
   const handleWhatsAppClick = async () => {
     if (!listing) return;
@@ -1459,15 +1616,25 @@ const ListingDetailPage = () => {
           <div className="lg:col-span-2 space-y-6">
             {/* Image Gallery */}
             <div className="bg-white rounded-xl overflow-hidden shadow-sm">
-              <div className="aspect-[16/10] relative bg-slate-100">
+              <div 
+                className="aspect-[16/10] relative bg-slate-100 cursor-pointer group"
+                onClick={() => handleImageClick(selectedImage)}
+              >
                 <img 
                   src={images[selectedImage]}
                   alt={listing.title}
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain transition-transform group-hover:scale-[1.02]"
                   onError={(e) => {
                     e.target.src = 'https://images.unsplash.com/photo-1758533696874-587c4e62940c?w=800&h=600&fit=crop';
                   }}
                 />
+                {/* Zoom hint overlay */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2">
+                    <Search className="w-4 h-4" />
+                    Clique para ampliar
+                  </div>
+                </div>
                 {listing.is_featured && (
                   <Badge className="absolute top-4 left-4 bg-[#F9C02D] text-[#1A4D2E] font-semibold">
                     <Star className="w-3 h-3 mr-1 fill-current" />
@@ -1491,6 +1658,14 @@ const ListingDetailPage = () => {
                 </div>
               )}
             </div>
+
+            {/* Lightbox */}
+            <ImageLightbox 
+              images={images}
+              initialIndex={selectedImage}
+              isOpen={lightboxOpen}
+              onClose={() => setLightboxOpen(false)}
+            />
 
             {/* Details */}
             <Card>
@@ -6010,6 +6185,11 @@ const SellerProfilePage = () => {
 // App Router
 const AppRouter = () => {
   const location = useLocation();
+  
+  // Scroll to top on route change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
   
   if (location.hash?.includes('session_id=')) {
     return <AuthCallback />;
