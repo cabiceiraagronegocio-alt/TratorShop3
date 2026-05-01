@@ -333,6 +333,42 @@ def generate_listing_slug(title: str, city: str, listing_id: str) -> str:
     suffix = listing_id.replace('listing_', '')[:6]
     return f"{text}-{suffix}"
 
+async def generate_profile_slug(name: str, existing_user_id: str = None) -> str:
+    """Generate unique SEO-friendly slug from store/user name"""
+    if not name:
+        return None
+    
+    # Normalize unicode characters (remove accents)
+    text = unicodedata.normalize('NFKD', name)
+    text = text.encode('ascii', 'ignore').decode('ascii')
+    # Convert to lowercase and replace spaces/special chars with hyphens
+    text = text.lower()
+    text = re.sub(r'[^a-z0-9\s-]', '', text)
+    text = re.sub(r'[\s_]+', '-', text)
+    text = re.sub(r'-+', '-', text)
+    text = text.strip('-')
+    # Limit length
+    text = text[:50]
+    
+    if not text:
+        text = "loja"
+    
+    # Check uniqueness and add suffix if needed
+    base_slug = text
+    counter = 1
+    while True:
+        query = {"profile_slug": text}
+        if existing_user_id:
+            query["user_id"] = {"$ne": existing_user_id}
+        
+        existing = await db.users.find_one(query)
+        if not existing:
+            break
+        counter += 1
+        text = f"{base_slug}-{counter}"
+    
+    return text
+
 def format_city_ms(city: str) -> str:
     """Format city with ' - MS' suffix for SEO"""
     if not city:
@@ -558,6 +594,10 @@ async def register_user(data: UserRegister):
     # Create new user with pending_approval status
     user_id = f"user_{uuid.uuid4().hex[:12]}"
     now = datetime.now(timezone.utc).isoformat()
+    
+    # Generate profile slug from name
+    profile_slug = await generate_profile_slug(data.name)
+    
     user_doc = {
         "user_id": user_id,
         "email": data.email.lower(),
@@ -571,6 +611,7 @@ async def register_user(data: UserRegister):
         "bio": None,
         "address": None,
         "store_name": None,
+        "profile_slug": profile_slug,
         "plan_type": None,
         "plan_price": None,
         "plan_expiration_date": None,
@@ -1134,6 +1175,7 @@ async def get_user_profile(request: Request):
         "bio": user.get("bio"),
         "address": user.get("address"),
         "store_name": user.get("store_name"),
+        "profile_slug": user.get("profile_slug"),
         "role": user.get("role", "user"),
         "status": user.get("status", "pending_approval"),
         "account_type": user.get("account_type"),
@@ -1267,6 +1309,51 @@ async def get_seller_public_profile(user_id: str):
     profile = {
         "user_id": user["user_id"],
         "name": user.get("store_name") or user.get("name"),
+        "profile_slug": user.get("profile_slug"),
+        "picture": user.get("picture"),
+        "bio": user.get("bio"),
+        "address": user.get("address"),
+        "website": user.get("website"),
+        "instagram": user.get("instagram"),
+        "facebook": user.get("facebook"),
+        "phone": user.get("phone"),
+        "role": user.get("role", "user"),
+        "plan_type": user.get("plan_type"),
+        "created_at": user.get("created_at"),
+        "listings": active_listings,
+        "total_listings": len(active_listings)
+    }
+    
+    # Add dealer-specific info if dealer
+    if user.get("role") == "dealer" and user.get("dealer_profile"):
+        profile["dealer_profile"] = {
+            "store_name": user["dealer_profile"].get("store_name"),
+            "store_slug": user["dealer_profile"].get("store_slug"),
+            "store_logo": user["dealer_profile"].get("store_logo"),
+            "city": user["dealer_profile"].get("city"),
+            "description": user["dealer_profile"].get("description")
+        }
+    
+    return profile
+
+@api_router.get("/tatto/{slug}")
+async def get_profile_by_slug(slug: str):
+    """Get public profile by slug (SEO-friendly URL)"""
+    user = await db.users.find_one({"profile_slug": slug}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Perfil não encontrado")
+    
+    # Count active listings
+    active_listings = await db.listings.find(
+        {"user_id": user["user_id"], "status": "approved"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    
+    # Prepare public profile data
+    profile = {
+        "user_id": user["user_id"],
+        "name": user.get("store_name") or user.get("name"),
+        "profile_slug": user.get("profile_slug"),
         "picture": user.get("picture"),
         "bio": user.get("bio"),
         "address": user.get("address"),
@@ -2549,9 +2636,28 @@ async def startup():
     await db.listings.create_index([("city", 1)])
     await db.listings.create_index([("slug", 1)])
     await db.users.create_index([("email", 1)], unique=True)
+    await db.users.create_index([("profile_slug", 1)])
     await db.user_sessions.create_index([("session_token", 1)], unique=True)
     await db.admins.create_index([("email", 1)], unique=True)
     await db.admin_sessions.create_index([("session_token", 1)], unique=True)
+    
+    # Generate profile slugs for users that don't have one
+    users_without_slug = await db.users.find({
+        "$or": [
+            {"profile_slug": {"$exists": False}},
+            {"profile_slug": None},
+            {"profile_slug": ""}
+        ]
+    }).to_list(1000)
+    for user in users_without_slug:
+        name = user.get("store_name") or user.get("name") or "usuario"
+        slug = await generate_profile_slug(name, user["user_id"])
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"profile_slug": slug}}
+        )
+    if users_without_slug:
+        logger.info(f"Generated profile slugs for {len(users_without_slug)} users")
     
     # Generate slugs for listings that don't have one
     listings_without_slug = await db.listings.find({"slug": {"$exists": False}}).to_list(1000)

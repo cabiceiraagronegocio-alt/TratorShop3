@@ -5988,9 +5988,45 @@ const StorePage = () => {
   );
 };
 
-// Seller Public Profile Page (SEO-friendly)
+// Seller Public Profile Page (redirect to SEO-friendly URL)
 const SellerProfilePage = () => {
   const { userId } = useParams();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAndRedirect = async () => {
+      try {
+        const res = await axios.get(`${API}/vendedor/${userId}`);
+        if (res.data.profile_slug) {
+          // Redirect to SEO-friendly URL
+          navigate(`/tatto/${res.data.profile_slug}`, { replace: true });
+        } else {
+          // Fallback: stay on this page but we'll need to show content
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Error fetching seller:", error);
+        navigate('/');
+      }
+    };
+    fetchAndRedirect();
+  }, [userId, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#1A4D2E]" />
+      </div>
+    );
+  }
+
+  return null;
+};
+
+// Profile by Slug Page (SEO-friendly URL)
+const ProfileBySlugPage = () => {
+  const { slug } = useParams();
   const [seller, setSeller] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -5999,7 +6035,7 @@ const SellerProfilePage = () => {
     const fetchSeller = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(`${API}/vendedor/${userId}`);
+        const res = await axios.get(`${API}/tatto/${slug}`);
         setSeller(res.data);
       } catch (error) {
         console.error("Error fetching seller:", error);
@@ -6009,7 +6045,7 @@ const SellerProfilePage = () => {
       }
     };
     fetchSeller();
-  }, [userId]);
+  }, [slug]);
 
   const formatPrice = (price) => {
     if (price === null || price === undefined || price === '') {
@@ -6023,7 +6059,7 @@ const SellerProfilePage = () => {
   };
 
   const handleShareProfile = () => {
-    const url = window.location.href;
+    const url = `${window.location.origin}/tatto/${slug}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       toast.success("Link copiado!");
@@ -6051,7 +6087,7 @@ const SellerProfilePage = () => {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <User className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Vendedor não encontrado</h1>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Perfil não encontrado</h1>
           <p className="text-slate-500 mb-6">Este perfil não existe ou não está disponível.</p>
           <Link to="/">
             <Button className="bg-[#1A4D2E] hover:bg-[#143d24]">
@@ -6064,11 +6100,13 @@ const SellerProfilePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50" data-testid="seller-profile-page">
+    <div className="min-h-screen bg-slate-50" data-testid="profile-by-slug-page">
       <SEOHead 
-        title={`${seller.name} - Vendedor de Máquinas Agrícolas em MS`}
-        description={seller.bio || `Veja os anúncios de ${seller.name} no TratorShop. Tratores, colheitadeiras e implementos em Campo Grande MS e Mato Grosso do Sul.`}
-        keywords={`${seller.name}, vendedor Campo Grande MS, tratores MS, máquinas agrícolas Mato Grosso do Sul`}
+        title={`${seller.name} - Máquinas Agrícolas MS | TratorShop`}
+        description={seller.bio || `Veja os anúncios de ${seller.name} no TratorShop. Tratores, colheitadeiras e implementos agrícolas em Campo Grande MS e todo Mato Grosso do Sul.`}
+        keywords={`${seller.name}, ${slug}, vendedor Campo Grande MS, tratores MS, máquinas agrícolas Mato Grosso do Sul, TratorShop`}
+        url={`https://tratorshop.com.br/tatto/${slug}`}
+        type="profile"
       />
       
       {/* Profile Header */}
@@ -6231,6 +6269,7 @@ const AppRouter = () => {
           <Route path="/lojas" element={<StoresListPage />} />
           <Route path="/loja/:slug" element={<StorePage />} />
           <Route path="/vendedor/:userId" element={<SellerProfilePage />} />
+          <Route path="/tatto/:slug" element={<ProfileBySlugPage />} />
         </Routes>
       </main>
       <Footer />
