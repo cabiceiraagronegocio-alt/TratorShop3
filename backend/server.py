@@ -15,9 +15,17 @@ import hashlib
 import secrets
 import unicodedata
 import re
+import asyncio
+from pywebpush import webpush, WebPushException
+from py_vapid import Vapid
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# VAPID Configuration for Web Push
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY")
+VAPID_PRIVATE_KEY_FILE = os.environ.get("VAPID_PRIVATE_KEY_FILE", str(ROOT_DIR / "vapid_private.pem"))
+VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "contato@tratorshop.com.br")
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -297,6 +305,11 @@ class AdminUpdateListing(BaseModel):
     status: Optional[str] = None
     is_featured: Optional[bool] = None
 
+# Web Push Subscription Model
+class PushSubscription(BaseModel):
+    endpoint: str
+    keys: dict  # Contains p256dh and auth keys
+
 # Password hashing utilities
 def hash_password(password: str) -> str:
     """Hash password with salt"""
@@ -386,6 +399,61 @@ MS_CITIES = [
 ]
 
 CATEGORIES = ["tratores", "implementos", "colheitadeiras", "pecas"]
+
+# =============================================================================
+# WEB PUSH NOTIFICATION FUNCTIONS
+# =============================================================================
+
+async def send_push_notification(user_id: str, title: str, body: str, url: str = None, icon: str = None):
+    """Send Web Push notification to a user"""
+    try:
+        # Get all subscriptions for this user
+        subscriptions = await db.push_subscriptions.find({"user_id": user_id}).to_list(100)
+        
+        if not subscriptions:
+            logger.info(f"No push subscriptions found for user {user_id}")
+            return False
+        
+        import json
+        payload = json.dumps({
+            "title": title,
+            "body": body,
+            "icon": icon or "/logo192.png",
+            "badge": "/logo192.png",
+            "url": url or "/",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
+        success_count = 0
+        for sub in subscriptions:
+            try:
+                subscription_info = {
+                    "endpoint": sub["endpoint"],
+                    "keys": sub["keys"]
+                }
+                
+                webpush(
+                    subscription_info=subscription_info,
+                    data=payload,
+                    vapid_private_key=VAPID_PRIVATE_KEY_FILE,
+                    vapid_claims={"sub": f"mailto:{VAPID_CLAIMS_EMAIL}"}
+                )
+                success_count += 1
+                logger.info(f"Push notification sent to user {user_id}")
+            except WebPushException as e:
+                # If subscription is expired/invalid, remove it
+                if e.response and e.response.status_code in [404, 410]:
+                    await db.push_subscriptions.delete_one({"_id": sub["_id"]})
+                    logger.info(f"Removed expired subscription for user {user_id}")
+                else:
+                    logger.error(f"WebPush error: {e}")
+            except Exception as e:
+                logger.error(f"Error sending push: {e}")
+        
+        return success_count > 0
+    except Exception as e:
+        logger.error(f"Error in send_push_notification: {e}")
+        return False
 
 # =============================================================================
 # AUTH ROUTES
@@ -851,6 +919,74 @@ PLANS = {
 async def get_plans():
     """Get available plans"""
     return {"plans": PLANS}
+
+# =============================================================================
+# WEB PUSH NOTIFICATION ROUTES
+# =============================================================================
+
+@api_router.get("/push/vapid-public-key")
+async def get_vapid_public_key():
+    """Get VAPID public key for Web Push subscription"""
+    return {"publicKey": VAPID_PUBLIC_KEY}
+
+@api_router.post("/push/subscribe")
+async def subscribe_to_push(subscription: PushSubscription, request: Request):
+    """Subscribe to Web Push notifications"""
+    user = await require_user(request)
+    
+    # Check if subscription already exists
+    existing = await db.push_subscriptions.find_one({
+        "user_id": user["user_id"],
+        "endpoint": subscription.endpoint
+    })
+    
+    if existing:
+        # Update existing subscription
+        await db.push_subscriptions.update_one(
+            {"_id": existing["_id"]},
+            {"$set": {
+                "keys": subscription.keys,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        return {"message": "Inscrição atualizada", "status": "updated"}
+    
+    # Create new subscription
+    sub_doc = {
+        "user_id": user["user_id"],
+        "endpoint": subscription.endpoint,
+        "keys": subscription.keys,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.push_subscriptions.insert_one(sub_doc)
+    
+    return {"message": "Inscrito para notificações", "status": "subscribed"}
+
+@api_router.delete("/push/unsubscribe")
+async def unsubscribe_from_push(request: Request):
+    """Unsubscribe from Web Push notifications"""
+    user = await require_user(request)
+    
+    result = await db.push_subscriptions.delete_many({"user_id": user["user_id"]})
+    
+    return {"message": f"Removidas {result.deleted_count} inscrições", "deleted": result.deleted_count}
+
+@api_router.post("/push/test")
+async def test_push_notification(request: Request):
+    """Send a test push notification to the current user"""
+    user = await require_user(request)
+    
+    success = await send_push_notification(
+        user_id=user["user_id"],
+        title="TratorShop",
+        body="Notificações ativadas com sucesso! 🚜",
+        url="/"
+    )
+    
+    if success:
+        return {"message": "Notificação de teste enviada"}
+    else:
+        raise HTTPException(status_code=400, detail="Nenhuma inscrição encontrada. Ative as notificações primeiro.")
 
 @api_router.post("/user/select-plan")
 async def select_plan(data: PlanSelection, request: Request):
@@ -2129,6 +2265,14 @@ async def track_whatsapp_click(listing_id: str, request: Request):
     # Increment counter
     await db.listings.update_one({"listing_id": listing_id}, {"$inc": {"whatsapp_clicks": 1}})
     
+    # Send push notification to listing owner
+    asyncio.create_task(send_push_notification(
+        user_id=listing["user_id"],
+        title="Novo interesse no seu anúncio! 📱",
+        body=f"Alguém quer entrar em contato sobre: {listing['title'][:50]}",
+        url=f"/anuncio/{listing.get('slug', listing_id)}"
+    ))
+    
     return {"message": "Click tracked"}
 
 # =============================================================================
@@ -2177,6 +2321,14 @@ async def approve_listing(listing_id: str, request: Request):
         }}
     )
     
+    # Send push notification to listing owner
+    asyncio.create_task(send_push_notification(
+        user_id=listing["user_id"],
+        title="Anúncio Aprovado! ✅",
+        body=f"Seu anúncio '{listing['title'][:40]}' foi aprovado e já está visível.",
+        url=f"/anuncio/{listing.get('slug', listing_id)}"
+    ))
+    
     return {"message": "Listing approved", "expires_at": expires_at.isoformat()}
 
 @api_router.post("/admin/listings/{listing_id}/reject")
@@ -2184,10 +2336,22 @@ async def reject_listing(listing_id: str, request: Request):
     """Reject a listing"""
     await require_admin(request)
     
+    listing = await db.listings.find_one({"listing_id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
     await db.listings.update_one(
         {"listing_id": listing_id},
         {"$set": {"status": "rejected"}}
     )
+    
+    # Send push notification to listing owner
+    asyncio.create_task(send_push_notification(
+        user_id=listing["user_id"],
+        title="Anúncio não aprovado",
+        body=f"Seu anúncio '{listing['title'][:40]}' não foi aprovado. Verifique as informações.",
+        url="/meus-anuncios"
+    ))
     
     return {"message": "Listing rejected"}
 
@@ -2374,6 +2538,14 @@ async def approve_user(user_id: str, request: Request):
         {"$set": {"status": "aprovado"}}
     )
     
+    # Send push notification to user
+    asyncio.create_task(send_push_notification(
+        user_id=user_id,
+        title="Cadastro Aprovado! 🎉",
+        body="Parabéns! Seu cadastro no TratorShop foi aprovado. Agora você pode criar anúncios.",
+        url="/meus-anuncios"
+    ))
+    
     return {"message": "Usuário aprovado com sucesso"}
 
 @api_router.post("/admin/users/{user_id}/reject")
@@ -2399,6 +2571,14 @@ async def reject_user(user_id: str, request: Request):
         {"user_id": user_id},
         {"$set": {"status": "rejeitado"}}
     )
+    
+    # Send push notification to user
+    asyncio.create_task(send_push_notification(
+        user_id=user_id,
+        title="Cadastro não aprovado",
+        body="Seu cadastro no TratorShop não foi aprovado. Entre em contato conosco para mais informações.",
+        url="/"
+    ))
     
     return {"message": "Usuário rejeitado"}
 

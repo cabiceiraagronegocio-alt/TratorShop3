@@ -2873,6 +2873,8 @@ const EditProfilePage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [profile, setProfile] = useState({
     name: '',
     phone: '',
@@ -2889,7 +2891,93 @@ const EditProfilePage = () => {
       return;
     }
     fetchProfile();
+    checkNotificationStatus();
   }, [user, navigate]);
+
+  const checkNotificationStatus = async () => {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        setNotificationsEnabled(!!subscription);
+      } catch (e) {
+        console.log('Could not check notification status');
+      }
+    }
+  };
+
+  const toggleNotifications = async () => {
+    setNotificationsLoading(true);
+    try {
+      if (notificationsEnabled) {
+        // Unsubscribe
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          await subscription.unsubscribe();
+        }
+        await axios.delete(`${API}/push/unsubscribe`, { withCredentials: true });
+        setNotificationsEnabled(false);
+        toast.success("Notificações desativadas");
+      } else {
+        // Subscribe
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          toast.error("Permissão de notificação negada");
+          return;
+        }
+
+        // Register service worker
+        await navigator.serviceWorker.register('/sw-push.js');
+        const registration = await navigator.serviceWorker.ready;
+
+        // Get VAPID key
+        const keyRes = await axios.get(`${API}/push/vapid-public-key`);
+        const publicKey = keyRes.data.publicKey;
+
+        // Convert key
+        const padding = '='.repeat((4 - publicKey.length % 4) % 4);
+        const base64 = (publicKey + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const applicationServerKey = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          applicationServerKey[i] = rawData.charCodeAt(i);
+        }
+
+        // Subscribe
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey
+        });
+
+        // Send to server
+        const p256dh = btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('p256dh'))));
+        const auth = btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('auth'))));
+        
+        await axios.post(`${API}/push/subscribe`, {
+          endpoint: subscription.endpoint,
+          keys: { p256dh, auth }
+        }, { withCredentials: true });
+
+        setNotificationsEnabled(true);
+        toast.success("Notificações ativadas!");
+
+        // Send test notification
+        setTimeout(async () => {
+          try {
+            await axios.post(`${API}/push/test`, {}, { withCredentials: true });
+          } catch (e) {
+            // Silent fail for test
+          }
+        }, 1000);
+      }
+    } catch (error) {
+      console.error("Notification toggle error:", error);
+      toast.error("Erro ao configurar notificações");
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
 
   const fetchProfile = async () => {
     try {
@@ -3061,6 +3149,38 @@ const EditProfilePage = () => {
                   className="mt-1"
                 />
               </div>
+
+              {/* Notifications Toggle */}
+              {'serviceWorker' in navigator && 'PushManager' in window && (
+                <div className="border rounded-lg p-4 bg-slate-50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium flex items-center gap-2">
+                        <MessageCircle className="w-4 h-4" />
+                        Notificações Push
+                      </h3>
+                      <p className="text-sm text-slate-500 mt-1">
+                        Receba alertas quando seu cadastro for aprovado ou alguém se interessar pelos seus anúncios
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant={notificationsEnabled ? "default" : "outline"}
+                      onClick={toggleNotifications}
+                      disabled={notificationsLoading}
+                      className={notificationsEnabled ? "bg-[#1A4D2E] hover:bg-[#143d24]" : ""}
+                    >
+                      {notificationsLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : notificationsEnabled ? (
+                        "Ativadas"
+                      ) : (
+                        "Ativar"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <Button
