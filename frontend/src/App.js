@@ -5881,13 +5881,22 @@ const LoginPage = () => {
       return;
     }
     
-    // Show push step if push is supported and permission not denied
-    if (isPushSupported() && Notification.permission !== 'denied') {
+    // Debug: verificar suporte a push
+    const pushSupported = isPushSupported();
+    console.log('[TratorShop] Push supported:', pushSupported);
+    console.log('[TratorShop] ServiceWorker:', 'serviceWorker' in navigator);
+    console.log('[TratorShop] PushManager:', 'PushManager' in window);
+    console.log('[TratorShop] Notification:', 'Notification' in window);
+    
+    // SEMPRE mostrar step de push se suportado pelo navegador
+    if (pushSupported) {
+      console.log('[TratorShop] Showing push step modal');
       setShowPushStep(true);
       return;
     }
     
-    // If push not supported or denied, proceed directly
+    // Se push não suportado, finaliza direto
+    console.log('[TratorShop] Push not supported, completing registration directly');
     await completeRegistration();
   };
 
