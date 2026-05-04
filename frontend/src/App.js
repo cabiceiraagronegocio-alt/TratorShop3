@@ -5822,6 +5822,8 @@ const LoginPage = () => {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPushStep, setShowPushStep] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -5879,6 +5881,17 @@ const LoginPage = () => {
       return;
     }
     
+    // Show push step if push is supported and permission not denied
+    if (isPushSupported() && Notification.permission !== 'denied') {
+      setShowPushStep(true);
+      return;
+    }
+    
+    // If push not supported or denied, proceed directly
+    await completeRegistration();
+  };
+
+  const completeRegistration = async (withPush = false) => {
     setLoading(true);
 
     try {
@@ -5892,6 +5905,20 @@ const LoginPage = () => {
         { withCredentials: true }
       );
       setUser(response.data);
+      
+      // If user chose to enable push, subscribe now
+      if (withPush) {
+        try {
+          await subscribeToPush();
+          toast.success('Notificações ativadas!');
+          // Mark that user already subscribed to skip modal
+          sessionStorage.setItem('pushModalSkipped', 'true');
+        } catch (pushError) {
+          console.log('Push subscription failed:', pushError);
+          // Silent fail - user can enable later
+        }
+      }
+      
       navigate('/dashboard');
     } catch (err) {
       const message = err.response?.data?.detail || 'Erro ao cadastrar';
@@ -5899,7 +5926,32 @@ const LoginPage = () => {
       toast.error(message);
     } finally {
       setLoading(false);
+      setShowPushStep(false);
     }
+  };
+
+  const handlePushAndRegister = async () => {
+    setPushLoading(true);
+    try {
+      // Request permission first
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        await completeRegistration(true);
+      } else {
+        // Permission denied, just complete registration
+        await completeRegistration(false);
+      }
+    } catch (error) {
+      // Error requesting permission, just complete registration
+      await completeRegistration(false);
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  const handleSkipPush = async () => {
+    setShowPushStep(false);
+    await completeRegistration(false);
   };
 
   return (
@@ -6042,6 +6094,63 @@ const LoginPage = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Push Notification Step Modal - Shows before completing registration */}
+      <Dialog open={showPushStep} onOpenChange={setShowPushStep}>
+        <DialogContent className="sm:max-w-md" data-testid="register-push-step">
+          <DialogHeader>
+            <div className="mx-auto w-20 h-20 bg-gradient-to-br from-[#1A4D2E] to-[#2d6b47] rounded-full flex items-center justify-center mb-4">
+              <BellRing className="w-10 h-10 text-white" />
+            </div>
+            <DialogTitle className="text-center text-xl">
+              Receba notificações sobre seus anúncios
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              Fique por dentro quando seu cadastro for aprovado e interessados entrarem em contato
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3 py-4">
+            <div className="flex items-start gap-3 text-sm bg-green-50 p-3 rounded-lg">
+              <Check className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+              <span><strong>Cadastro aprovado</strong> - saiba na hora</span>
+            </div>
+            <div className="flex items-start gap-3 text-sm bg-green-50 p-3 rounded-lg">
+              <Check className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+              <span><strong>Anúncios aprovados</strong> - comece a vender</span>
+            </div>
+            <div className="flex items-start gap-3 text-sm bg-green-50 p-3 rounded-lg">
+              <Check className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+              <span><strong>Interessados</strong> - não perca contatos</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Button 
+              onClick={handlePushAndRegister} 
+              disabled={loading || pushLoading}
+              className="w-full bg-[#1A4D2E] hover:bg-[#143d24] py-6"
+              data-testid="register-enable-push"
+            >
+              {(loading || pushLoading) ? (
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              ) : (
+                <Bell className="w-5 h-5 mr-2" />
+              )}
+              Ativar e Finalizar Cadastro
+            </Button>
+            <Button 
+              variant="ghost" 
+              onClick={handleSkipPush}
+              disabled={loading || pushLoading}
+              className="w-full text-slate-500"
+              data-testid="register-skip-push"
+            >
+              Pular
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

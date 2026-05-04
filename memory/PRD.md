@@ -9,36 +9,44 @@
 ### Sistema de Auto-Prompt para Push Notifications
 Implementado sistema completo para aumentar a taxa de ativação de notificações push:
 
-1. **Modal de Ativação (PushNotificationModal)**
+1. **Step de Push no Cadastro (NOVO)**
+   - Ao clicar "Cadastrar", se push suportado, exibe modal antes de finalizar
+   - Modal com benefícios: cadastro aprovado, anúncios aprovados, interessados
+   - Botões: "Ativar e Finalizar Cadastro" ou "Pular"
+   - Se ativar: solicita permissão, registra SW, salva subscription, finaliza cadastro
+   - Se pular: finaliza cadastro normalmente
+   - Maior taxa de conversão por capturar no momento de maior intenção
+
+2. **Modal de Ativação Pós-Login (Fallback)**
    - Aparece automaticamente após login para usuários sem subscription
    - Mostra benefícios: aprovação de cadastro, aprovação de anúncios, interessados
    - Botões: "Ativar Notificações" e "Agora não"
    - Usa sessionStorage para não repetir no mesmo acesso
 
-2. **Banner de Reforço (PushNotificationBanner)**
+3. **Banner de Reforço (PushNotificationBanner)**
    - Aparece no topo da página se usuário pulou o modal
    - Visual clean com gradiente verde
    - Botão compacto para ativar
    - Pode ser dispensado
 
-3. **Hook usePushNotificationPrompt**
+4. **Hook usePushNotificationPrompt**
    - Verifica se usuário já tem subscription
    - Gerencia estado de modal/banner
    - Respeita permissão negada do navegador
 
-4. **Triggers de Envio de Push**
+5. **Triggers de Envio de Push**
    - Quando usuário é aprovado (`approve_user`)
    - Quando anúncio é aprovado (`approve_listing`)
    - Quando anúncio é rejeitado (`reject_listing`)
    - Clique no WhatsApp do anúncio (`record_whatsapp_click`)
 
-5. **Backend Endpoints**
+6. **Backend Endpoints**
    - `GET /api/push/vapid-public-key` - Retorna chave pública VAPID
    - `POST /api/push/subscribe` - Salva subscription no MongoDB
    - `DELETE /api/push/unsubscribe` - Remove subscriptions
    - `POST /api/push/test` - Envia notificação de teste
 
-6. **Service Worker (sw-push.js)**
+7. **Service Worker (sw-push.js)**
    - Recebe push events
    - Exibe notificação nativa do navegador
    - Trata cliques para abrir app
