@@ -1,6 +1,49 @@
 # TratorShop - PRD Atualizado
 
-## Última Atualização: 11/04/2026
+## Última Atualização: 04/05/2026
+
+---
+
+## IMPLEMENTAÇÃO WEB PUSH NOTIFICATIONS (04/05/2026) ✅
+
+### Sistema de Auto-Prompt para Push Notifications
+Implementado sistema completo para aumentar a taxa de ativação de notificações push:
+
+1. **Modal de Ativação (PushNotificationModal)**
+   - Aparece automaticamente após login para usuários sem subscription
+   - Mostra benefícios: aprovação de cadastro, aprovação de anúncios, interessados
+   - Botões: "Ativar Notificações" e "Agora não"
+   - Usa sessionStorage para não repetir no mesmo acesso
+
+2. **Banner de Reforço (PushNotificationBanner)**
+   - Aparece no topo da página se usuário pulou o modal
+   - Visual clean com gradiente verde
+   - Botão compacto para ativar
+   - Pode ser dispensado
+
+3. **Hook usePushNotificationPrompt**
+   - Verifica se usuário já tem subscription
+   - Gerencia estado de modal/banner
+   - Respeita permissão negada do navegador
+
+4. **Triggers de Envio de Push**
+   - Quando usuário é aprovado (`approve_user`)
+   - Quando anúncio é aprovado (`approve_listing`)
+   - Quando anúncio é rejeitado (`reject_listing`)
+   - Clique no WhatsApp do anúncio (`record_whatsapp_click`)
+
+5. **Backend Endpoints**
+   - `GET /api/push/vapid-public-key` - Retorna chave pública VAPID
+   - `POST /api/push/subscribe` - Salva subscription no MongoDB
+   - `DELETE /api/push/unsubscribe` - Remove subscriptions
+   - `POST /api/push/test` - Envia notificação de teste
+
+6. **Service Worker (sw-push.js)**
+   - Recebe push events
+   - Exibe notificação nativa do navegador
+   - Trata cliques para abrir app
+
+**Testes**: 14/14 passaram (100%) - `/app/test_reports/iteration_11.json`
 
 ---
 
@@ -125,21 +168,23 @@
 ## STACK TECNOLÓGICA
 
 - **Frontend**: React 19, React Router v7, TailwindCSS, Shadcn/UI, Leaflet
-- **Backend**: FastAPI, Motor (MongoDB Async)
+- **Backend**: FastAPI, Motor (MongoDB Async), pywebpush (Web Push)
 - **Storage**: Emergent Object Storage
 - **Auth**: JWT interno + Google OAuth (Emergent Auth)
+- **Push**: Web Push API com VAPID keys
 
 ---
 
 ## TAREFAS PENDENTES
 
 ### P1 - Prioridade Alta
-- [ ] Notificações por email para aprovação/rejeição de anúncios
+- [ ] Notificações por email (Resend) - Usuário pulou input da API Key
 - [ ] Filtros avançados de busca (ano, horas de uso)
 
 ### P2 - Prioridade Média
 - [ ] Sistema de favoritos
 - [ ] Chat entre compradores e vendedores
+- [ ] Renomear rota `/tatto/{slug}` para `/vendedor/{slug}` (era do TattoShop)
 
 ---
 
@@ -149,4 +194,4 @@ GitHub: https://github.com/cabiceiraagronegocio-alt/TratorShop3
 
 ---
 
-*Atualizado em 11/04/2026*
+*Atualizado em 04/05/2026*
