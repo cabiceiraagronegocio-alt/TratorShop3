@@ -5881,22 +5881,13 @@ const LoginPage = () => {
       return;
     }
     
-    // Debug: verificar suporte a push
-    const pushSupported = isPushSupported();
-    console.log('[TratorShop] Push supported:', pushSupported);
-    console.log('[TratorShop] ServiceWorker:', 'serviceWorker' in navigator);
-    console.log('[TratorShop] PushManager:', 'PushManager' in window);
-    console.log('[TratorShop] Notification:', 'Notification' in window);
-    
-    // SEMPRE mostrar step de push se suportado pelo navegador
-    if (pushSupported) {
-      console.log('[TratorShop] Showing push step modal');
+    // Mostrar step de push se suportado pelo navegador
+    if (isPushSupported()) {
       setShowPushStep(true);
       return;
     }
     
     // Se push não suportado, finaliza direto
-    console.log('[TratorShop] Push not supported, completing registration directly');
     await completeRegistration();
   };
 
