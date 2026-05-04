@@ -39,6 +39,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { SEOHead, getListingSEO, getSearchSEO } from "@/components/SEOHead";
 import { citiesMS } from "@/data/citiesMS";
+import { Bell, BellRing } from "lucide-react";
 
 // Fix Leaflet default marker icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -186,6 +187,314 @@ const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
+};
+
+// =============================================================================
+// PUSH NOTIFICATION COMPONENTS
+// =============================================================================
+
+// Check if push notifications are supported
+const isPushSupported = () => {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+};
+
+// Subscribe to push notifications
+const subscribeToPush = async () => {
+  if (!isPushSupported()) {
+    throw new Error('Push não suportado neste navegador');
+  }
+
+  // Request permission
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') {
+    throw new Error('Permissão negada');
+  }
+
+  // Register service worker
+  await navigator.serviceWorker.register('/sw-push.js');
+  const registration = await navigator.serviceWorker.ready;
+
+  // Get VAPID key
+  const keyRes = await axios.get(`${API}/push/vapid-public-key`);
+  const publicKey = keyRes.data.publicKey;
+
+  // Convert key to Uint8Array
+  const padding = '='.repeat((4 - publicKey.length % 4) % 4);
+  const base64 = (publicKey + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const applicationServerKey = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    applicationServerKey[i] = rawData.charCodeAt(i);
+  }
+
+  // Subscribe
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: applicationServerKey
+  });
+
+  // Send to server
+  const p256dh = btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('p256dh'))));
+  const auth = btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('auth'))));
+  
+  await axios.post(`${API}/push/subscribe`, {
+    endpoint: subscription.endpoint,
+    keys: { p256dh, auth }
+  }, { withCredentials: true });
+
+  return subscription;
+};
+
+// Check if user has active subscription
+const checkPushSubscription = async () => {
+  if (!isPushSupported()) return false;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    return !!subscription;
+  } catch {
+    return false;
+  }
+};
+
+// Push Notification Modal - shown after login
+const PushNotificationModal = ({ isOpen, onClose, onSuccess }) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleEnable = async () => {
+    setLoading(true);
+    try {
+      await subscribeToPush();
+      toast.success("Notificações ativadas com sucesso!");
+      onSuccess?.();
+      onClose();
+      
+      // Send test notification after 1 second
+      setTimeout(async () => {
+        try {
+          await axios.post(`${API}/push/test`, {}, { withCredentials: true });
+        } catch (e) {
+          // Silent fail
+        }
+      }, 1000);
+    } catch (error) {
+      console.error("Push subscription error:", error);
+      if (error.message === 'Permissão negada') {
+        toast.error("Você negou a permissão. Pode ativar depois em Editar Perfil.");
+      } else {
+        toast.error("Erro ao ativar notificações");
+      }
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSkip = () => {
+    // Mark as skipped for this session
+    sessionStorage.setItem('pushModalSkipped', 'true');
+    onClose();
+  };
+
+  if (!isPushSupported()) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md" data-testid="push-notification-modal">
+        <DialogHeader>
+          <div className="mx-auto w-16 h-16 bg-[#1A4D2E]/10 rounded-full flex items-center justify-center mb-4">
+            <BellRing className="w-8 h-8 text-[#1A4D2E]" />
+          </div>
+          <DialogTitle className="text-center text-xl">Ativar Notificações?</DialogTitle>
+          <DialogDescription className="text-center">
+            Receba alertas importantes no seu navegador:
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-3 py-4">
+          <div className="flex items-start gap-3 text-sm">
+            <Check className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+            <span>Quando seu <strong>cadastro for aprovado</strong></span>
+          </div>
+          <div className="flex items-start gap-3 text-sm">
+            <Check className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+            <span>Quando seu <strong>anúncio for aprovado</strong></span>
+          </div>
+          <div className="flex items-start gap-3 text-sm">
+            <Check className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+            <span>Quando alguém <strong>se interessar</strong> pela sua máquina</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Button 
+            onClick={handleEnable} 
+            disabled={loading}
+            className="w-full bg-[#1A4D2E] hover:bg-[#143d24]"
+            data-testid="enable-push-button"
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Bell className="w-4 h-4 mr-2" />
+            )}
+            Ativar Notificações
+          </Button>
+          <Button 
+            variant="ghost" 
+            onClick={handleSkip}
+            className="w-full text-slate-500"
+            data-testid="skip-push-button"
+          >
+            Agora não
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// Push Notification Banner - shown in header area
+const PushNotificationBanner = ({ onDismiss }) => {
+  const [loading, setLoading] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+
+  const handleEnable = async () => {
+    setLoading(true);
+    try {
+      await subscribeToPush();
+      toast.success("Notificações ativadas!");
+      setDismissed(true);
+      onDismiss?.();
+      
+      // Send test notification
+      setTimeout(async () => {
+        try {
+          await axios.post(`${API}/push/test`, {}, { withCredentials: true });
+        } catch (e) {}
+      }, 1000);
+    } catch (error) {
+      if (error.message === 'Permissão negada') {
+        toast.error("Permissão negada. Ative nas configurações do navegador.");
+      } else {
+        toast.error("Erro ao ativar notificações");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDismiss = () => {
+    sessionStorage.setItem('pushBannerDismissed', 'true');
+    setDismissed(true);
+    onDismiss?.();
+  };
+
+  if (dismissed) return null;
+
+  return (
+    <div className="bg-gradient-to-r from-[#1A4D2E] to-[#2d6b47] text-white py-2.5 px-4" data-testid="push-notification-banner">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <BellRing className="w-5 h-5 shrink-0 animate-pulse" />
+          <p className="text-sm">
+            <span className="hidden sm:inline">Ative as notificações e receba avisos sobre seus anúncios!</span>
+            <span className="sm:hidden">Ative as notificações!</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            size="sm"
+            onClick={handleEnable}
+            disabled={loading}
+            className="bg-white text-[#1A4D2E] hover:bg-white/90 h-8 px-3"
+            data-testid="banner-enable-push"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Ativar"}
+          </Button>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={handleDismiss}
+            className="text-white/70 hover:text-white hover:bg-white/10 h-8 px-2"
+            data-testid="banner-dismiss-push"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Hook to manage push notification prompts
+const usePushNotificationPrompt = () => {
+  const { user } = useAuth();
+  const [showModal, setShowModal] = useState(false);
+  const [showBanner, setShowBanner] = useState(false);
+  const [hasSubscription, setHasSubscription] = useState(true); // Assume true initially
+  const checkedRef = useRef(false);
+
+  useEffect(() => {
+    if (!user || checkedRef.current) return;
+    
+    const checkAndPrompt = async () => {
+      checkedRef.current = true;
+      
+      if (!isPushSupported()) return;
+      
+      // Check if user already has subscription
+      const subscribed = await checkPushSubscription();
+      setHasSubscription(subscribed);
+      
+      if (subscribed) return; // Already subscribed, no need to prompt
+      
+      // Check if permission was denied
+      if (Notification.permission === 'denied') {
+        return; // User blocked notifications, don't bother
+      }
+      
+      // Check if modal was already shown this session
+      const modalSkipped = sessionStorage.getItem('pushModalSkipped');
+      const bannerDismissed = sessionStorage.getItem('pushBannerDismissed');
+      
+      if (!modalSkipped) {
+        // Show modal after a short delay (let page load first)
+        setTimeout(() => setShowModal(true), 1500);
+      } else if (!bannerDismissed) {
+        // Show banner instead
+        setShowBanner(true);
+      }
+    };
+    
+    checkAndPrompt();
+  }, [user]);
+
+  const handleModalClose = () => {
+    setShowModal(false);
+    // Show banner as fallback if user skipped modal
+    if (!sessionStorage.getItem('pushBannerDismissed')) {
+      setShowBanner(true);
+    }
+  };
+
+  const handleSuccess = () => {
+    setHasSubscription(true);
+    setShowBanner(false);
+  };
+
+  const handleBannerDismiss = () => {
+    setShowBanner(false);
+  };
+
+  return {
+    showModal,
+    showBanner,
+    hasSubscription,
+    handleModalClose,
+    handleSuccess,
+    handleBannerDismiss
+  };
 };
 
 // Auth Callback Component
@@ -6343,6 +6652,13 @@ const ProfileBySlugPage = () => {
 // App Router
 const AppRouter = () => {
   const location = useLocation();
+  const { 
+    showModal, 
+    showBanner, 
+    handleModalClose, 
+    handleSuccess, 
+    handleBannerDismiss 
+  } = usePushNotificationPrompt();
   
   // Scroll to top on route change
   useEffect(() => {
@@ -6375,6 +6691,9 @@ const AppRouter = () => {
 
   return (
     <>
+      {/* Push Notification Banner - shows if user logged in without subscription */}
+      {showBanner && <PushNotificationBanner onDismiss={handleBannerDismiss} />}
+      
       <Header />
       <main>
         <Routes>
@@ -6393,6 +6712,13 @@ const AppRouter = () => {
         </Routes>
       </main>
       <Footer />
+      
+      {/* Push Notification Modal - shows after login */}
+      <PushNotificationModal 
+        isOpen={showModal} 
+        onClose={handleModalClose}
+        onSuccess={handleSuccess}
+      />
     </>
   );
 };
