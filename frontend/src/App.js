@@ -55,6 +55,57 @@ const isLocalhost = window.location.hostname === 'localhost' || window.location.
 const BACKEND_URL = isLocalhost ? 'http://localhost:8001' : (process.env.REACT_APP_BACKEND_URL || window.location.origin);
 const API = `${BACKEND_URL}/api`;
 
+// =============================================================================
+// PLANS CONTEXT - Centraliza dados dos planos
+// =============================================================================
+const PlansContext = createContext(null);
+
+export const usePlans = () => useContext(PlansContext);
+
+const PlansProvider = ({ children }) => {
+  const [plans, setPlans] = useState({
+    anuncio_unico: { name: "Anúncio Único", max_listings: 1, price: 49, validity_days: 90 },
+    lojista: { name: "Lojista", max_listings: 30, price: 275, validity_days: 90 }
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const response = await axios.get(`${API}/plans`);
+        if (response.data?.plans) {
+          setPlans(response.data.plans);
+        }
+      } catch (error) {
+        console.error('Error fetching plans:', error);
+        // Keep default values on error
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPlans();
+  }, []);
+
+  // Helper functions
+  const getPlanPrice = (planType) => plans[planType]?.price || 0;
+  const getPlanMaxListings = (planType) => plans[planType]?.max_listings || 1;
+  const getPlanName = (planType) => plans[planType]?.name || planType;
+  const formatPrice = (price) => `R$ ${price.toFixed(2).replace('.', ',')}`;
+
+  return (
+    <PlansContext.Provider value={{ 
+      plans, 
+      loading, 
+      getPlanPrice, 
+      getPlanMaxListings, 
+      getPlanName,
+      formatPrice 
+    }}>
+      {children}
+    </PlansContext.Provider>
+  );
+};
+
 // Admin Auth Context
 const AdminAuthContext = createContext(null);
 
@@ -2487,6 +2538,7 @@ const ListingFormPage = () => {
 // Onboarding Page Component (Full Page - Required for new users)
 const OnboardingPage = () => {
   const { user, setUser } = useAuth();
+  const { plans, formatPrice, getPlanMaxListings } = usePlans();
   const navigate = useNavigate();
   const [accountType, setAccountType] = useState('');
   const [storeName, setStoreName] = useState('');
@@ -2662,14 +2714,14 @@ const OnboardingPage = () => {
                     <User className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-lg text-slate-900">Anúncio Único</h3>
+                    <h3 className="font-bold text-lg text-slate-900">{plans.anuncio_unico?.name || 'Anúncio Único'}</h3>
                     <p className="text-sm text-slate-500">Para vendas pontuais</p>
                   </div>
                 </div>
                 <div className="space-y-2 mb-4">
                   <p className="flex items-center gap-2 text-slate-700">
                     <Check className="w-4 h-4 text-green-500" />
-                    1 anúncio ativo
+                    {getPlanMaxListings('anuncio_unico')} anúncio ativo
                   </p>
                   <p className="flex items-center gap-2 text-slate-700">
                     <Check className="w-4 h-4 text-green-500" />
@@ -2677,7 +2729,7 @@ const OnboardingPage = () => {
                   </p>
                 </div>
                 <div className="pt-4 border-t">
-                  <p className="text-3xl font-bold text-blue-600">R$ 49</p>
+                  <p className="text-3xl font-bold text-blue-600">{formatPrice(plans.anuncio_unico?.price || 49)}</p>
                   <p className="text-sm text-slate-500">pagamento trimestral</p>
                 </div>
               </button>
@@ -2702,14 +2754,14 @@ const OnboardingPage = () => {
                     <Store className="w-6 h-6 text-[#1A4D2E]" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-lg text-slate-900">Lojista</h3>
+                    <h3 className="font-bold text-lg text-slate-900">{plans.lojista?.name || 'Lojista'}</h3>
                     <p className="text-sm text-slate-500">Para revendedores</p>
                   </div>
                 </div>
                 <div className="space-y-2 mb-4">
                   <p className="flex items-center gap-2 text-slate-700">
                     <Check className="w-4 h-4 text-green-500" />
-                    Até 30 anúncios ativos
+                    Até {getPlanMaxListings('lojista')} anúncios ativos
                   </p>
                   <p className="flex items-center gap-2 text-slate-700">
                     <Check className="w-4 h-4 text-green-500" />
@@ -2721,7 +2773,7 @@ const OnboardingPage = () => {
                   </p>
                 </div>
                 <div className="pt-4 border-t">
-                  <p className="text-3xl font-bold text-[#1A4D2E]">R$ 275</p>
+                  <p className="text-3xl font-bold text-[#1A4D2E]">{formatPrice(plans.lojista?.price || 275)}</p>
                   <p className="text-sm text-slate-500">trimestral</p>
                 </div>
               </button>
@@ -2777,16 +2829,16 @@ const OnboardingPage = () => {
                 <User className="w-7 h-7" />
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-lg text-slate-900">Anúncio Único</h3>
+                <h3 className="font-bold text-lg text-slate-900">{plans.anuncio_unico?.name || 'Anúncio Único'}</h3>
                 <p className="text-sm text-slate-500 mt-1">
                   Ideal para quem quer vender algumas máquinas.
                 </p>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <Badge variant="secondary" className="bg-slate-100 text-slate-600">
-                    1 anúncio
+                    {getPlanMaxListings('anuncio_unico')} anúncio
                   </Badge>
                   <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                    R$ 49,00
+                    {formatPrice(plans.anuncio_unico?.price || 49)}
                   </Badge>
                   <Badge variant="secondary" className="bg-green-100 text-green-700">
                     Válido por 3 meses
@@ -2814,16 +2866,16 @@ const OnboardingPage = () => {
                 <Store className="w-7 h-7" />
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-lg text-slate-900">Lojista / Revendedor</h3>
+                <h3 className="font-bold text-lg text-slate-900">{plans.lojista?.name || 'Lojista'} / Revendedor</h3>
                 <p className="text-sm text-slate-500 mt-1">
                   Para lojas e empresas que vendem regularmente.
                 </p>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <Badge className="bg-[#F9C02D]/20 text-[#1A4D2E]">
-                    Até 30 anúncios
+                    Até {getPlanMaxListings('lojista')} anúncios
                   </Badge>
                   <Badge className="bg-[#1A4D2E]/10 text-[#1A4D2E]">
-                    R$ 275,00
+                    {formatPrice(plans.lojista?.price || 275)}
                   </Badge>
                   <Badge className="bg-green-100 text-green-700">
                     Válido por 3 meses
@@ -3748,6 +3800,7 @@ const AdminChangePasswordPage = () => {
 // Admin Page
 const AdminPage = () => {
   const { admin, adminLogout } = useAdminAuth();
+  const { plans, formatPrice, getPlanMaxListings, getPlanName } = usePlans();
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [users, setUsers] = useState([]);
@@ -3764,7 +3817,7 @@ const AdminPage = () => {
   const [showPromoteModal, setShowPromoteModal] = useState(false);
   const [promoteEmail, setPromoteEmail] = useState('');
   const [promoteStoreName, setPromoteStoreName] = useState('');
-  const [promoteMaxListings, setPromoteMaxListings] = useState('20');
+  const [promoteMaxListings, setPromoteMaxListings] = useState(String(getPlanMaxListings('lojista')));
   const [promotingUser, setPromotingUser] = useState(false);
   
   // Edit Dealer Limit Modal
@@ -4262,7 +4315,7 @@ const AdminPage = () => {
     navigate('/admin-login');
   };
 
-  const formatPrice = (price) => {
+  const formatListingPrice = (price) => {
     if (price === null || price === undefined || price === '') {
       return 'Consultar valor';
     }
@@ -4558,7 +4611,7 @@ const AdminPage = () => {
                                     </Badge>
                                   )}
                                 </div>
-                                <p className="text-[#F9C02D] font-bold">{formatPrice(listing.price)}</p>
+                                <p className="text-[#F9C02D] font-bold">{formatListingPrice(listing.price)}</p>
                                 <p className="text-sm text-slate-400">
                                   {listing.city} • Por: {listing.seller?.name || 'N/A'} ({listing.seller?.email})
                                 </p>
@@ -5067,7 +5120,9 @@ const AdminPage = () => {
                             <p className="font-medium text-white">{lead.name}</p>
                             {lead.plan_type && (
                               <Badge className={lead.plan_type === 'lojista' ? 'bg-[#F9C02D] text-[#1A4D2E]' : 'bg-blue-600'}>
-                                {lead.plan_type === 'lojista' ? 'Lojista - R$275' : 'Anúncio Único - R$49'}
+                                {lead.plan_type === 'lojista' 
+                                  ? `${getPlanName('lojista')} - ${formatPrice(plans.lojista?.price || 275)}` 
+                                  : `${getPlanName('anuncio_unico')} - ${formatPrice(plans.anuncio_unico?.price || 49)}`}
                               </Badge>
                             )}
                           </div>
@@ -5665,7 +5720,7 @@ const AdminPage = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-white truncate">{listing.title}</h4>
-                      <p className="text-sm text-[#F9C02D]">{formatPrice(listing.price)}</p>
+                      <p className="text-sm text-[#F9C02D]">{formatListingPrice(listing.price)}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <Badge 
                           className={
@@ -5768,8 +5823,12 @@ const AdminPage = () => {
                   onChange={(e) => setCreateUserData({...createUserData, account_type: e.target.value})}
                   className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
                 >
-                  <option value="anuncio_unico">Anúncio Único - R$49 (1 anúncio / 3 meses)</option>
-                  <option value="lojista">Lojista - R$275 (30 anúncios / 3 meses)</option>
+                  <option value="anuncio_unico">
+                    {getPlanName('anuncio_unico')} - {formatPrice(plans.anuncio_unico?.price || 49)} ({getPlanMaxListings('anuncio_unico')} anúncio / 3 meses)
+                  </option>
+                  <option value="lojista">
+                    {getPlanName('lojista')} - {formatPrice(plans.lojista?.price || 275)} ({getPlanMaxListings('lojista')} anúncios / 3 meses)
+                  </option>
                 </select>
               </div>
               <div>
@@ -6837,8 +6896,10 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <AdminAuthProvider>
-          <Toaster position="top-center" richColors />
-          <AppRouter />
+          <PlansProvider>
+            <Toaster position="top-center" richColors />
+            <AppRouter />
+          </PlansProvider>
         </AdminAuthProvider>
       </AuthProvider>
     </BrowserRouter>
