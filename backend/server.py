@@ -226,7 +226,7 @@ class DealerProfile(BaseModel):
     whatsapp: str
     city: str
     description: Optional[str] = None
-    max_listings: int = 20
+    max_listings: int = 30
     is_active: bool = True
     created_at: str
 
@@ -245,7 +245,7 @@ class DealerProfileUpdate(BaseModel):
 class PromoteToDealer(BaseModel):
     user_email: str
     store_name: str
-    max_listings: int = 20
+    max_listings: int = 30
 
 class SetDealerLimit(BaseModel):
     max_listings: int
@@ -908,9 +908,9 @@ PLANS = {
     },
     "lojista": {
         "name": "Lojista",
-        "max_listings": 20,
-        "price": 149.00,
-        "first_payment": 97.00,
+        "max_listings": 30,
+        "price": 275.00,
+        "first_payment": 275.00,
         "validity_days": 90
     }
 }
@@ -1359,7 +1359,7 @@ async def complete_onboarding(data: UserOnboarding, request: Request):
             "whatsapp": "",
             "city": "",
             "description": "",
-            "max_listings": 20,  # Dealers start with 20 listings (Plano Lojista)
+            "max_listings": 30,  # Dealers start with 30 listings (Plano Lojista)
             "is_active": True,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
@@ -1750,7 +1750,7 @@ async def admin_update_user(user_id: str, data: AdminUserUpdate, request: Reques
             # Create dealer profile if promoting to dealer
             update_data["dealer_profile"] = {
                 "store_name": user.get("name", ""),
-                "max_listings": 20
+                "max_listings": 30
             }
     if data.max_listings is not None:
         if user.get("role") == "dealer" or data.role == "dealer":

@@ -2709,7 +2709,7 @@ const OnboardingPage = () => {
                 <div className="space-y-2 mb-4">
                   <p className="flex items-center gap-2 text-slate-700">
                     <Check className="w-4 h-4 text-green-500" />
-                    Até 20 anúncios ativos
+                    Até 30 anúncios ativos
                   </p>
                   <p className="flex items-center gap-2 text-slate-700">
                     <Check className="w-4 h-4 text-green-500" />
@@ -2721,7 +2721,7 @@ const OnboardingPage = () => {
                   </p>
                 </div>
                 <div className="pt-4 border-t">
-                  <p className="text-3xl font-bold text-[#1A4D2E]">R$ 149</p>
+                  <p className="text-3xl font-bold text-[#1A4D2E]">R$ 275</p>
                   <p className="text-sm text-slate-500">trimestral</p>
                 </div>
               </button>
@@ -2820,10 +2820,10 @@ const OnboardingPage = () => {
                 </p>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <Badge className="bg-[#F9C02D]/20 text-[#1A4D2E]">
-                    Até 20 anúncios
+                    Até 30 anúncios
                   </Badge>
                   <Badge className="bg-[#1A4D2E]/10 text-[#1A4D2E]">
-                    R$ 149,00
+                    R$ 275,00
                   </Badge>
                   <Badge className="bg-green-100 text-green-700">
                     Válido por 3 meses
@@ -5067,7 +5067,7 @@ const AdminPage = () => {
                             <p className="font-medium text-white">{lead.name}</p>
                             {lead.plan_type && (
                               <Badge className={lead.plan_type === 'lojista' ? 'bg-[#F9C02D] text-[#1A4D2E]' : 'bg-blue-600'}>
-                                {lead.plan_type === 'lojista' ? 'Lojista - R$149' : 'Anúncio Único - R$49'}
+                                {lead.plan_type === 'lojista' ? 'Lojista - R$275' : 'Anúncio Único - R$49'}
                               </Badge>
                             )}
                           </div>
@@ -5769,7 +5769,7 @@ const AdminPage = () => {
                   className="w-full mt-1 bg-slate-700 border border-slate-600 text-white rounded-md p-2"
                 >
                   <option value="anuncio_unico">Anúncio Único - R$49 (1 anúncio / 3 meses)</option>
-                  <option value="lojista">Lojista - R$149 (20 anúncios / 3 meses)</option>
+                  <option value="lojista">Lojista - R$275 (30 anúncios / 3 meses)</option>
                 </select>
               </div>
               <div>
