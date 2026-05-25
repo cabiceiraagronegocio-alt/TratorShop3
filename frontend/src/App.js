@@ -802,7 +802,7 @@ const Footer = () => (
           <h4 className="font-semibold mb-4" style={{ fontFamily: 'Outfit' }}>Contato</h4>
           <p className="text-white/70 text-sm">
             Dúvidas ou sugestões?<br />
-            contato@tratorshop.com.br
+            contato@portaltratorshop.com.br
           </p>
           
           {/* Redes Sociais */}
@@ -6702,7 +6702,7 @@ const ProfileBySlugPage = () => {
         title={`${seller.name} - Máquinas Agrícolas MS | TratorShop`}
         description={seller.bio || `Veja os anúncios de ${seller.name} no TratorShop. Tratores, colheitadeiras e implementos agrícolas em Campo Grande MS e todo Mato Grosso do Sul.`}
         keywords={`${seller.name}, ${slug}, vendedor Campo Grande MS, tratores MS, máquinas agrícolas Mato Grosso do Sul, TratorShop`}
-        url={`https://tratorshop.com.br/tatto/${slug}`}
+        url={`https://portaltratorshop.com.br/tatto/${slug}`}
         type="profile"
       />
       

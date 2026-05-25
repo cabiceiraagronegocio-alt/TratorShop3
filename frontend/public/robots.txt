@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://tratorshop.com.br/sitemap.xml
+Sitemap: https://portaltratorshop.com.br/sitemap.xml

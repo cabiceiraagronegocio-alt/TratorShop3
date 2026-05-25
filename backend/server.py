@@ -25,7 +25,7 @@ load_dotenv(ROOT_DIR / '.env')
 # VAPID Configuration for Web Push
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY")
 VAPID_PRIVATE_KEY_FILE = os.environ.get("VAPID_PRIVATE_KEY_FILE", str(ROOT_DIR / "vapid_private.pem"))
-VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "contato@tratorshop.com.br")
+VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "contato@portaltratorshop.com.br")
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -2693,7 +2693,7 @@ async def root():
 @api_router.get("/seo/sitemap")
 async def api_sitemap():
     """API endpoint for sitemap - generates dynamic sitemap.xml"""
-    base_url = "https://tratorshop.com.br"
+    base_url = "https://portaltratorshop.com.br"
     
     # Start XML
     xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -2759,7 +2759,7 @@ async def api_robots():
     content = """User-agent: *
 Allow: /
 
-Sitemap: https://tratorshop.com.br/sitemap.xml
+Sitemap: https://portaltratorshop.com.br/sitemap.xml
 """
     return Response(content=content, media_type="text/plain")
 

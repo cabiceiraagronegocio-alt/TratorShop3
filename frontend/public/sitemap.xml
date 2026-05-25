@@ -3,27 +3,27 @@
 <!-- Este arquivo é um placeholder. Use a versão dinâmica do backend. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://tratorshop.com.br/</loc>
+    <loc>https://portaltratorshop.com.br/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://tratorshop.com.br/tratores</loc>
+    <loc>https://portaltratorshop.com.br/tratores</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://tratorshop.com.br/implementos</loc>
+    <loc>https://portaltratorshop.com.br/implementos</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://tratorshop.com.br/colheitadeiras</loc>
+    <loc>https://portaltratorshop.com.br/colheitadeiras</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://tratorshop.com.br/pecas</loc>
+    <loc>https://portaltratorshop.com.br/pecas</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
