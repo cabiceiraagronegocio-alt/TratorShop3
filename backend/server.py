@@ -398,7 +398,7 @@ MS_CITIES = [
     "Chapadão do Sul", "Costa Rica", "São Gabriel do Oeste", "Jardim", "Bonito"
 ]
 
-CATEGORIES = ["tratores", "implementos", "colheitadeiras", "pecas"]
+CATEGORIES = ["tratores", "implementos", "colheitadeiras", "pecas", "diversos"]
 
 # =============================================================================
 # WEB PUSH NOTIFICATION FUNCTIONS
@@ -1629,7 +1629,7 @@ async def get_admin_stats(request: Request):
     
     # Count by category
     categories = {}
-    for cat in ["tratores", "implementos", "colheitadeiras", "pecas"]:
+    for cat in ["tratores", "implementos", "colheitadeiras", "pecas", "diversos"]:
         categories[cat] = await db.listings.count_documents({"category": cat, "status": "approved"})
     
     # Recent activity (last 7 days)
@@ -2661,7 +2661,8 @@ async def get_categories():
         {"id": "tratores", "name": "Tratores", "icon": "tractor"},
         {"id": "implementos", "name": "Implementos", "icon": "wrench"},
         {"id": "colheitadeiras", "name": "Colheitadeiras", "icon": "combine"},
-        {"id": "pecas", "name": "Peças", "icon": "cog"}
+        {"id": "pecas", "name": "Peças", "icon": "cog"},
+        {"id": "diversos", "name": "Diversos", "icon": "package"}
     ]
 
 @api_router.get("/cities")
@@ -2706,6 +2707,7 @@ async def api_sitemap():
         {"loc": "/implementos", "priority": "0.9", "changefreq": "daily"},
         {"loc": "/colheitadeiras", "priority": "0.9", "changefreq": "daily"},
         {"loc": "/pecas", "priority": "0.9", "changefreq": "daily"},
+        {"loc": "/diversos", "priority": "0.9", "changefreq": "daily"},
         {"loc": "/buscar", "priority": "0.8", "changefreq": "daily"},
     ]
     

@@ -634,6 +634,9 @@ const Header = () => {
             <Link to="/buscar?category=pecas" className="text-slate-600 hover:text-[#1A4D2E] transition-colors" data-testid="nav-parts">
               Peças
             </Link>
+            <Link to="/buscar?category=diversos" className="text-slate-600 hover:text-[#1A4D2E] transition-colors" data-testid="nav-misc">
+              Diversos
+            </Link>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -730,6 +733,9 @@ const Header = () => {
               <Link to="/buscar?category=pecas" className="px-3 py-2 text-slate-600 hover:bg-slate-50 rounded-lg" onClick={() => setMobileMenuOpen(false)}>
                 Peças
               </Link>
+              <Link to="/buscar?category=diversos" className="px-3 py-2 text-slate-600 hover:bg-slate-50 rounded-lg" onClick={() => setMobileMenuOpen(false)}>
+                Diversos
+              </Link>
               <div className="pt-2 mt-2 border-t border-slate-100 space-y-2">
                 <Button 
                   onClick={() => { navigate(user ? '/anunciar' : '/login'); setMobileMenuOpen(false); }}
@@ -784,6 +790,7 @@ const Footer = () => (
             <li><Link to="/buscar?category=implementos" className="hover:text-white">Implementos</Link></li>
             <li><Link to="/buscar?category=colheitadeiras" className="hover:text-white">Colheitadeiras</Link></li>
             <li><Link to="/buscar?category=pecas" className="hover:text-white">Peças</Link></li>
+            <li><Link to="/buscar?category=diversos" className="hover:text-white">Diversos</Link></li>
             <li><Link to="/lojas" className="hover:text-white">Lojas Oficiais</Link></li>
           </ul>
         </div>
@@ -1497,7 +1504,8 @@ const HomePage = () => {
     { id: 'tratores', name: 'Tratores' },
     { id: 'implementos', name: 'Implementos' },
     { id: 'colheitadeiras', name: 'Colheitadeiras' },
-    { id: 'pecas', name: 'Peças' }
+    { id: 'pecas', name: 'Peças' },
+    { id: 'diversos', name: 'Diversos' }
   ];
 
   return (
@@ -1727,7 +1735,8 @@ const SearchPage = () => {
     tratores: 'Tratores',
     implementos: 'Implementos',
     colheitadeiras: 'Colheitadeiras',
-    pecas: 'Peças'
+    pecas: 'Peças',
+    diversos: 'Diversos'
   };
 
   return (
@@ -2373,6 +2382,7 @@ const ListingFormPage = () => {
                       <SelectItem value="implementos">Implementos</SelectItem>
                       <SelectItem value="colheitadeiras">Colheitadeiras</SelectItem>
                       <SelectItem value="pecas">Peças</SelectItem>
+                      <SelectItem value="diversos">Diversos</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -4482,7 +4492,8 @@ const AdminPage = () => {
                         { key: 'tratores', label: 'Tratores', icon: Tractor },
                         { key: 'implementos', label: 'Implementos', icon: Wrench },
                         { key: 'colheitadeiras', label: 'Colheitadeiras', icon: Cog },
-                        { key: 'pecas', label: 'Peças', icon: Settings }
+                        { key: 'pecas', label: 'Peças', icon: Settings },
+                        { key: 'diversos', label: 'Diversos', icon: Package }
                       ].map(cat => (
                         <div key={cat.key} className="flex items-center justify-between">
                           <div className="flex items-center gap-2 text-slate-300">
@@ -5528,6 +5539,7 @@ const AdminPage = () => {
                     <option value="implementos">Implementos</option>
                     <option value="colheitadeiras">Colheitadeiras</option>
                     <option value="pecas">Peças</option>
+                    <option value="diversos">Diversos</option>
                   </select>
                 </div>
                 <div>
@@ -6411,7 +6423,8 @@ const StorePage = () => {
     tratores: 'Tratores',
     implementos: 'Implementos',
     colheitadeiras: 'Colheitadeiras',
-    pecas: 'Peças'
+    pecas: 'Peças',
+    diversos: 'Diversos'
   };
 
   if (loading && !dealer) {
