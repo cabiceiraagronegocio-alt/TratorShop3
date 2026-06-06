@@ -7,11 +7,20 @@
 /* Leaflet CSS import */
 @import 'leaflet/dist/leaflet.css';
 
-/* Block any dynamically injected Emergent badge */
+/* Block any dynamically injected Emergent badge or "Built with" watermarks */
 #emergent-badge,
 [id*="emergent"],
+[id*="built-with"],
+[class*="emergent"],
+[class*="built-with"],
+[class*="watermark"],
+[class*="platform-badge"],
 a[href*="emergent.sh"],
-a[href*="emergentagent"] {
+a[href*="emergentagent"],
+div[style*="fixed"][style*="bottom"],
+iframe[src*="emergent"],
+[data-testid*="watermark"],
+[data-testid*="badge"] {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
@@ -20,6 +29,7 @@ a[href*="emergentagent"] {
     height: 0 !important;
     position: absolute !important;
     left: -9999px !important;
+    z-index: -9999 !important;
 }
 
 body {

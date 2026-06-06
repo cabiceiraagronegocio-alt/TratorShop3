@@ -422,7 +422,9 @@ const PushNotificationBanner = ({ onDismiss }) => {
       setTimeout(async () => {
         try {
           await axios.post(`${API}/push/test`, {}, { withCredentials: true });
-        } catch (e) {}
+        } catch (e) {
+          // Silent fail - test notification is optional
+        }
       }, 1000);
     } catch (error) {
       if (error.message === 'Permissão negada') {
@@ -546,6 +548,102 @@ const usePushNotificationPrompt = () => {
     handleSuccess,
     handleBannerDismiss
   };
+};
+
+// =============================================================================
+// SHARE BUTTON COMPONENT
+// =============================================================================
+const ShareButton = ({ 
+  url, 
+  title, 
+  text, 
+  variant = "default", // "default", "icon", "whatsapp"
+  className = "",
+  showLabel = true 
+}) => {
+  const [copied, setCopied] = useState(false);
+  
+  const fullUrl = url.startsWith('http') ? url : `https://portaltratorshop.com.br${url}`;
+  
+  const handleShare = async () => {
+    // Try Web Share API first (mobile)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: title,
+          text: text,
+          url: fullUrl
+        });
+        return;
+      } catch (err) {
+        // User cancelled or error - fall through to copy
+        if (err.name === 'AbortError') return;
+      }
+    }
+    
+    // Fallback: copy to clipboard
+    try {
+      await navigator.clipboard.writeText(fullUrl);
+      setCopied(true);
+      toast.success("Link copiado!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      // Final fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = fullUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      toast.success("Link copiado!");
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+  
+  const handleWhatsAppShare = () => {
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${text}\n${fullUrl}`)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+  
+  if (variant === "whatsapp") {
+    return (
+      <Button
+        onClick={handleWhatsAppShare}
+        className={`bg-green-500 hover:bg-green-600 text-white ${className}`}
+        data-testid="share-whatsapp-button"
+      >
+        <MessageCircle className="w-4 h-4" />
+        {showLabel && <span className="ml-2">Compartilhar</span>}
+      </Button>
+    );
+  }
+  
+  if (variant === "icon") {
+    return (
+      <Button
+        onClick={handleShare}
+        variant="outline"
+        size="icon"
+        className={className}
+        data-testid="share-icon-button"
+      >
+        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Share2 className="w-4 h-4" />}
+      </Button>
+    );
+  }
+  
+  return (
+    <Button
+      onClick={handleShare}
+      variant="outline"
+      className={className}
+      data-testid="share-button"
+    >
+      {copied ? <Check className="w-4 h-4 mr-2 text-green-500" /> : <Share2 className="w-4 h-4 mr-2" />}
+      {showLabel && (copied ? "Copiado!" : "Compartilhar")}
+    </Button>
+  );
 };
 
 // Auth Callback Component
@@ -832,6 +930,13 @@ const Footer = () => (
             >
               <Facebook className="w-5 h-5 text-white" />
             </a>
+            <ShareButton 
+              url="/"
+              title="TratorShop - Máquinas Agrícolas MS"
+              text="Confira máquinas agrícolas no TratorShop - O maior marketplace do MS!"
+              variant="icon"
+              className="w-10 h-10 bg-white/10 rounded-full border-0 hover:bg-white/20 text-white"
+            />
           </div>
           
           <div className="mt-4 pt-4 border-t border-white/10">
@@ -2042,15 +2147,23 @@ const ListingDetailPage = () => {
                 <h1 className="text-2xl md:text-3xl font-bold text-slate-900" style={{ fontFamily: 'Outfit' }}>
                   {listing.title}
                 </h1>
-                <div className="flex items-center gap-4 text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    {listing.city?.includes(' - MS') ? listing.city : `${listing.city}, ${listing.state}`}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Eye className="w-4 h-4" />
-                    {listing.views} visualizações
-                  </span>
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-4 text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      {listing.city?.includes(' - MS') ? listing.city : `${listing.city}, ${listing.state}`}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Eye className="w-4 h-4" />
+                      {listing.views} visualizações
+                    </span>
+                  </div>
+                  <ShareButton 
+                    url={`/anuncio/${listing.slug || listing.listing_id}`}
+                    title={listing.title}
+                    text={`Confira este anúncio no TratorShop: ${listing.title}`}
+                    variant="icon"
+                  />
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -6668,13 +6781,41 @@ const ProfileBySlugPage = () => {
     }).format(price);
   };
 
-  const handleShareProfile = () => {
-    const url = `${window.location.origin}/tatto/${slug}`;
-    navigator.clipboard.writeText(url).then(() => {
+  const handleShareProfile = async () => {
+    const url = `https://portaltratorshop.com.br/tatto/${slug}`;
+    const shareText = `Veja os anúncios deste lojista no TratorShop: ${seller.name}`;
+    
+    // Try Web Share API first (mobile)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${seller.name} - TratorShop`,
+          text: shareText,
+          url: url
+        });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+    
+    // Fallback: copy to clipboard
+    try {
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       toast.success("Link copiado!");
       setTimeout(() => setCopied(false), 2000);
-    });
+    } catch (err) {
+      const textArea = document.createElement("textarea");
+      textArea.value = url;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      toast.success("Link copiado!");
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleWhatsAppClick = () => {
