@@ -155,6 +155,7 @@ class ListingCreate(BaseModel):
     description: str
     category: str
     price: Optional[float] = None  # Optional - shows "Consultar valor" when null
+    price_type: Optional[str] = "fixed"  # "fixed" or "hourly" (for locacao category)
     brand: Optional[str] = None
     model: Optional[str] = None
     year: Optional[int] = None
@@ -168,6 +169,7 @@ class ListingUpdate(BaseModel):
     description: Optional[str] = None
     category: Optional[str] = None
     price: Optional[float] = None
+    price_type: Optional[str] = None  # "fixed" or "hourly"
     brand: Optional[str] = None
     model: Optional[str] = None
     year: Optional[int] = None
@@ -398,7 +400,7 @@ MS_CITIES = [
     "Chapadão do Sul", "Costa Rica", "São Gabriel do Oeste", "Jardim", "Bonito"
 ]
 
-CATEGORIES = ["tratores", "implementos", "colheitadeiras", "pecas", "diversos"]
+CATEGORIES = ["tratores", "implementos", "colheitadeiras", "pecas", "locacao", "diversos"]
 
 # =============================================================================
 # WEB PUSH NOTIFICATION FUNCTIONS
@@ -1629,7 +1631,7 @@ async def get_admin_stats(request: Request):
     
     # Count by category
     categories = {}
-    for cat in ["tratores", "implementos", "colheitadeiras", "pecas", "diversos"]:
+    for cat in ["tratores", "implementos", "colheitadeiras", "pecas", "locacao", "diversos"]:
         categories[cat] = await db.listings.count_documents({"category": cat, "status": "approved"})
     
     # Recent activity (last 7 days)
@@ -2662,6 +2664,7 @@ async def get_categories():
         {"id": "implementos", "name": "Implementos", "icon": "wrench"},
         {"id": "colheitadeiras", "name": "Colheitadeiras", "icon": "combine"},
         {"id": "pecas", "name": "Peças", "icon": "cog"},
+        {"id": "locacao", "name": "Locação", "icon": "clock"},
         {"id": "diversos", "name": "Diversos", "icon": "package"}
     ]
 
@@ -2707,6 +2710,7 @@ async def api_sitemap():
         {"loc": "/implementos", "priority": "0.9", "changefreq": "daily"},
         {"loc": "/colheitadeiras", "priority": "0.9", "changefreq": "daily"},
         {"loc": "/pecas", "priority": "0.9", "changefreq": "daily"},
+        {"loc": "/locacao", "priority": "0.9", "changefreq": "daily"},
         {"loc": "/diversos", "priority": "0.9", "changefreq": "daily"},
         {"loc": "/buscar", "priority": "0.8", "changefreq": "daily"},
     ]

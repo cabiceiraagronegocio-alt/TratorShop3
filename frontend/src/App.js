@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
@@ -651,6 +651,10 @@ const AuthCallback = () => {
   const navigate = useNavigate();
   const { setUser } = useAuth();
   const hasProcessed = useRef(false);
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [userData, setUserData] = useState(null);
 
   useEffect(() => {
     if (hasProcessed.current) return;
@@ -671,6 +675,15 @@ const AuthCallback = () => {
           { session_id: sessionId },
           { withCredentials: true }
         );
+        
+        // Check if user has phone
+        if (!response.data.phone) {
+          // User needs to provide phone number
+          setUserData(response.data);
+          setShowPhoneModal(true);
+          return;
+        }
+        
         setUser(response.data);
         toast.success(`Bem-vindo, ${response.data.name}!`);
         
@@ -689,6 +702,87 @@ const AuthCallback = () => {
 
     processAuth();
   }, [navigate, setUser]);
+
+  const handlePhoneSubmit = async () => {
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length < 10 || phoneDigits.length > 13) {
+      toast.error('Informe um WhatsApp válido');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Update user with phone
+      await axios.put(
+        `${API}/user/profile`,
+        { phone },
+        { withCredentials: true }
+      );
+      
+      // Complete login
+      const updatedUser = { ...userData, phone };
+      setUser(updatedUser);
+      toast.success(`Bem-vindo, ${updatedUser.name}!`);
+      setShowPhoneModal(false);
+      
+      if (updatedUser.is_admin) {
+        navigate('/admin', { replace: true, state: { user: updatedUser } });
+      } else {
+        navigate('/dashboard', { replace: true, state: { user: updatedUser } });
+      }
+    } catch (error) {
+      console.error("Error updating phone:", error);
+      toast.error("Erro ao salvar telefone");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (showPhoneModal) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 bg-[#1A4D2E]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Phone className="w-8 h-8 text-[#1A4D2E]" />
+            </div>
+            <CardTitle className="text-xl">Quase lá!</CardTitle>
+            <CardDescription>
+              Para finalizar seu cadastro, informe seu WhatsApp
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="phone">WhatsApp *</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="(67) 99999-9999"
+                className="mt-1"
+                data-testid="google-phone-input"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Usaremos este número para contato sobre seus anúncios
+              </p>
+            </div>
+            <Button 
+              onClick={handlePhoneSubmit}
+              disabled={loading}
+              className="w-full bg-[#1A4D2E] hover:bg-[#143d24]"
+              data-testid="google-phone-submit"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              Continuar
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -731,6 +825,9 @@ const Header = () => {
             </Link>
             <Link to="/buscar?category=pecas" className="text-slate-600 hover:text-[#1A4D2E] transition-colors" data-testid="nav-parts">
               Peças
+            </Link>
+            <Link to="/buscar?category=locacao" className="text-slate-600 hover:text-[#1A4D2E] transition-colors" data-testid="nav-rental">
+              Locação
             </Link>
             <Link to="/buscar?category=diversos" className="text-slate-600 hover:text-[#1A4D2E] transition-colors" data-testid="nav-misc">
               Diversos
@@ -831,6 +928,9 @@ const Header = () => {
               <Link to="/buscar?category=pecas" className="px-3 py-2 text-slate-600 hover:bg-slate-50 rounded-lg" onClick={() => setMobileMenuOpen(false)}>
                 Peças
               </Link>
+              <Link to="/buscar?category=locacao" className="px-3 py-2 text-slate-600 hover:bg-slate-50 rounded-lg" onClick={() => setMobileMenuOpen(false)}>
+                Locação
+              </Link>
               <Link to="/buscar?category=diversos" className="px-3 py-2 text-slate-600 hover:bg-slate-50 rounded-lg" onClick={() => setMobileMenuOpen(false)}>
                 Diversos
               </Link>
@@ -888,6 +988,7 @@ const Footer = () => (
             <li><Link to="/buscar?category=implementos" className="hover:text-white">Implementos</Link></li>
             <li><Link to="/buscar?category=colheitadeiras" className="hover:text-white">Colheitadeiras</Link></li>
             <li><Link to="/buscar?category=pecas" className="hover:text-white">Peças</Link></li>
+            <li><Link to="/buscar?category=locacao" className="hover:text-white">Locação</Link></li>
             <li><Link to="/buscar?category=diversos" className="hover:text-white">Diversos</Link></li>
             <li><Link to="/lojas" className="hover:text-white">Lojas Oficiais</Link></li>
           </ul>
@@ -962,15 +1063,21 @@ const ListingCard = ({ listing }) => {
     ? `${API}/files/${listing.images[0]}`
     : 'https://images.unsplash.com/photo-1758533696874-587c4e62940c?w=400&h=300&fit=crop';
 
-  const formatPrice = (price) => {
+  const formatPrice = (price, category, priceType) => {
     if (price === null || price === undefined || price === '') {
       return 'Consultar valor';
     }
-    return new Intl.NumberFormat('pt-BR', {
+    const formattedPrice = new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
       minimumFractionDigits: 0
     }).format(price);
+    
+    // Show "/hora" for rental category
+    if (category === 'locacao' || priceType === 'hourly') {
+      return `${formattedPrice} / hora`;
+    }
+    return formattedPrice;
   };
 
   return (
@@ -997,7 +1104,7 @@ const ListingCard = ({ listing }) => {
         )}
       </div>
       <CardContent className="p-4">
-        <p className="price-tag mb-2">{formatPrice(listing.price)}</p>
+        <p className="price-tag mb-2">{formatPrice(listing.price, listing.category, listing.price_type)}</p>
         <h3 className="font-semibold text-slate-900 line-clamp-2 mb-2 group-hover:text-[#1A4D2E] transition-colors">
           {listing.title}
         </h3>
@@ -1575,7 +1682,9 @@ const HomePage = () => {
     tratores: 'https://images.unsplash.com/photo-1758533696874-587c4e62940c?w=600&h=400&fit=crop',
     implementos: 'https://images.pexels.com/photos/2933243/pexels-photo-2933243.jpeg?auto=compress&w=600&h=400&fit=crop',
     colheitadeiras: 'https://images.pexels.com/photos/6680160/pexels-photo-6680160.jpeg?auto=compress&w=600&h=400&fit=crop',
-    pecas: 'https://images.pexels.com/photos/7568421/pexels-photo-7568421.jpeg?auto=compress&w=600&h=400&fit=crop'
+    pecas: 'https://images.pexels.com/photos/7568421/pexels-photo-7568421.jpeg?auto=compress&w=600&h=400&fit=crop',
+    locacao: 'https://images.unsplash.com/photo-1614977645540-7abd88ba8e56?w=600&h=400&fit=crop',
+    diversos: 'https://images.pexels.com/photos/3066789/pexels-photo-3066789.jpeg?auto=compress&w=600&h=400&fit=crop'
   };
 
   useEffect(() => {
@@ -1610,6 +1719,7 @@ const HomePage = () => {
     { id: 'implementos', name: 'Implementos' },
     { id: 'colheitadeiras', name: 'Colheitadeiras' },
     { id: 'pecas', name: 'Peças' },
+    { id: 'locacao', name: 'Locação' },
     { id: 'diversos', name: 'Diversos' }
   ];
 
@@ -1655,7 +1765,7 @@ const HomePage = () => {
               Ver todas <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
             {categories.map(category => (
               <CategoryCard 
                 key={category.id}
@@ -1841,6 +1951,7 @@ const SearchPage = () => {
     implementos: 'Implementos',
     colheitadeiras: 'Colheitadeiras',
     pecas: 'Peças',
+    locacao: 'Locação',
     diversos: 'Diversos'
   };
 
@@ -2021,15 +2132,21 @@ const ListingDetailPage = () => {
     window.open(`https://wa.me/55${phone}?text=${message}`, '_blank');
   };
 
-  const formatPrice = (price) => {
+  const formatPrice = (price, category, priceType) => {
     if (price === null || price === undefined || price === '') {
       return 'Consultar valor';
     }
-    return new Intl.NumberFormat('pt-BR', {
+    const formattedPrice = new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
       minimumFractionDigits: 0
     }).format(price);
+    
+    // Show "/hora" for rental category
+    if (category === 'locacao' || priceType === 'hourly') {
+      return `${formattedPrice} / hora`;
+    }
+    return formattedPrice;
   };
 
   if (loading) {
@@ -2224,7 +2341,7 @@ const ListingDetailPage = () => {
             <Card className="sticky top-24">
               <CardContent className="p-6">
                 <p className="text-4xl font-bold text-[#1A4D2E] mb-6" style={{ fontFamily: 'Outfit' }}>
-                  {formatPrice(listing.price)}
+                  {formatPrice(listing.price, listing.category, listing.price_type)}
                 </p>
                 
                 <Button 
@@ -2291,6 +2408,7 @@ const ListingFormPage = () => {
     description: '',
     category: '',
     price: '',
+    price_type: 'fixed', // 'fixed' or 'hourly' (for locacao)
     brand: '',
     model: '',
     year: '',
@@ -2370,7 +2488,14 @@ const ListingFormPage = () => {
   }, [currentUser, authLoading, navigate, isEditing, editId]);
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      // Auto-set price_type based on category
+      if (field === 'category') {
+        updated.price_type = value === 'locacao' ? 'hourly' : 'fixed';
+      }
+      return updated;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -2495,22 +2620,37 @@ const ListingFormPage = () => {
                       <SelectItem value="implementos">Implementos</SelectItem>
                       <SelectItem value="colheitadeiras">Colheitadeiras</SelectItem>
                       <SelectItem value="pecas">Peças</SelectItem>
+                      <SelectItem value="locacao">Locação</SelectItem>
                       <SelectItem value="diversos">Diversos</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div>
-                  <Label htmlFor="price">Preço (R$)</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    value={formData.price}
-                    onChange={(e) => handleChange('price', e.target.value)}
-                    placeholder="Opcional — deixe em branco para 'Consultar valor'"
-                    className="mt-1"
-                    data-testid="input-price"
-                  />
+                  <Label htmlFor="price">
+                    {formData.category === 'locacao' ? 'Valor por Hora (R$/hora)' : 'Preço (R$)'}
+                  </Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      id="price"
+                      type="number"
+                      value={formData.price}
+                      onChange={(e) => handleChange('price', e.target.value)}
+                      placeholder={formData.category === 'locacao' ? "Ex: 150" : "Opcional — deixe em branco para 'Consultar valor'"}
+                      className="flex-1"
+                      data-testid="input-price"
+                    />
+                    {formData.category === 'locacao' && formData.price && (
+                      <span className="flex items-center px-3 bg-slate-100 text-slate-600 rounded-md text-sm font-medium">
+                        /hora
+                      </span>
+                    )}
+                  </div>
+                  {formData.category === 'locacao' && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Para locação, o valor será exibido como "R$ X / hora"
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -3121,15 +3261,21 @@ const DashboardPage = () => {
     }
   };
 
-  const formatPrice = (price) => {
+  const formatPrice = (price, category, priceType) => {
     if (price === null || price === undefined || price === '') {
       return 'Consultar valor';
     }
-    return new Intl.NumberFormat('pt-BR', {
+    const formattedPrice = new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
       minimumFractionDigits: 0
     }).format(price);
+    
+    // Show "/hora" for rental category
+    if (category === 'locacao' || priceType === 'hourly') {
+      return `${formattedPrice} / hora`;
+    }
+    return formattedPrice;
   };
 
   const statusBadges = {
@@ -3306,7 +3452,7 @@ const DashboardPage = () => {
                           )}
                         </div>
                         <h3 className="font-semibold text-lg">{listing.title}</h3>
-                        <p className="text-[#1A4D2E] font-bold">{formatPrice(listing.price)}</p>
+                        <p className="text-[#1A4D2E] font-bold">{formatPrice(listing.price, listing.category, listing.price_type)}</p>
                         <p className="text-sm text-slate-500">{listing.city} • {listing.views} views • {listing.whatsapp_clicks} cliques WhatsApp</p>
                       </div>
                       <div className="flex gap-2">
@@ -4606,6 +4752,7 @@ const AdminPage = () => {
                         { key: 'implementos', label: 'Implementos', icon: Wrench },
                         { key: 'colheitadeiras', label: 'Colheitadeiras', icon: Cog },
                         { key: 'pecas', label: 'Peças', icon: Settings },
+                        { key: 'locacao', label: 'Locação', icon: Clock },
                         { key: 'diversos', label: 'Diversos', icon: Package }
                       ].map(cat => (
                         <div key={cat.key} className="flex items-center justify-between">
@@ -5652,6 +5799,7 @@ const AdminPage = () => {
                     <option value="implementos">Implementos</option>
                     <option value="colheitadeiras">Colheitadeiras</option>
                     <option value="pecas">Peças</option>
+                    <option value="locacao">Locação</option>
                     <option value="diversos">Diversos</option>
                   </select>
                 </div>
@@ -6537,6 +6685,7 @@ const StorePage = () => {
     implementos: 'Implementos',
     colheitadeiras: 'Colheitadeiras',
     pecas: 'Peças',
+    locacao: 'Locação',
     diversos: 'Diversos'
   };
 
